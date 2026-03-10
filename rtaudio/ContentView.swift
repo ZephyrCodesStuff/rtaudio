@@ -143,20 +143,64 @@ class SystemAudioScanner: NSObject, SCStreamOutput, ObservableObject {
     }
 }
 
-struct ContentView: View {
-    @StateObject private var audio = SystemAudioScanner() // The class we wrote earlier
-
-        var body: some View {
-            VStack {
-                WaveformView(magnitudes: audio.magnitudes)
-                    .frame(height: 200)
-                
-                Button("Start Visualizer") {
-                    Task { await audio.startCapture() }
-                }
-            }
-            .padding()
+func getAppleMusicArtwork() -> NSImage? {
+    let script = """
+    tell application "Music"
+        try
+            return raw data of artwork 1 of current track
+        end try
+    end tell
+    """
+    
+    var error: NSDictionary?
+    if let appleScript = NSAppleScript(source: script) {
+        let output = appleScript.executeAndReturnError(&error)
+        
+        if let error = error {
+            print("🍎 AppleScript Blocked/Failed: \(error)")
+            return nil
         }
+        
+        print(output.data)
+        return NSImage(data: output.data)
+    }
+    
+    return nil
+}
+
+struct ContentView: View {
+    @StateObject private var audio = SystemAudioScanner()
+    @State private var artwork: NSImage? = nil // We'll store the album art here
+
+    var body: some View {
+        VStack {
+            if let art = artwork {
+                // The Apple UI Trick!
+                Image(nsImage: art)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    // Match this width to the total width of your 4 bars
+                    .frame(width: 50, height: 160) 
+                    // Apple's signature "vibrant" look:
+                    .blur(radius: 15)
+                    .saturation(1.8)
+                    // Cut the image out using your hardware-accelerated Canvas
+                    .mask {
+                        WaveformView(magnitudes: audio.magnitudes)
+                    }
+            } else {
+                // Fallback if no music is playing
+                WaveformView(magnitudes: audio.magnitudes)
+            }
+            
+            Button("Start Visualizer") {
+                Task { await audio.startCapture() }
+                // Grab the artwork when we start!
+                self.artwork = getAppleMusicArtwork()
+            }
+        }
+        .padding()
+    }
 }
 
 #Preview {
