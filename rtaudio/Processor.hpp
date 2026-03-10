@@ -84,34 +84,28 @@ private:
     // 4. Magnitudes
     vDSP_zvmags(&complexBuffer, 1, fftMags.data(), 1, nOver2);
 
-    // 5. Group into bands using PEAK instead of AVERAGE
+    // 5. Group into bands using vDSP (Hardware Accelerated)
     float raw[4] = {0, 0, 0, 0};
 
-    // Helper lambda to find the highest peak in a range of bins
+    // Highly optimized lambda using Accelerate
     auto calculateBandPeak = [&](int startBin, int endBin) {
-      float maxAmp = 0;
-      for (int b = startBin; b <= endBin; ++b) {
-        float amp = sqrtf(fftMags[b]);
-        if (amp > maxAmp) {
-          maxAmp = amp;
-        }
-      }
-      return maxAmp;
+      float maxSquaredAmp = 0;
+      vDSP_Length length = endBin - startBin + 1;
+
+      // Scan the array slice and find the maximum squared value instantly
+      vDSP_maxv(&fftMags[startBin], 1, &maxSquaredAmp, length);
+
+      // Do the expensive square root operation ONLY ONCE per band
+      return sqrtf(maxSquaredAmp);
     };
 
     raw[0] = calculateBandPeak(1, 5);
     raw[1] = calculateBandPeak(6, 42);
     raw[2] = calculateBandPeak(43, 128);
-    raw[3] =
-        calculateBandPeak(129, 426); // This will now catch those cymbal hits!
+    raw[3] = calculateBandPeak(129, 426);
 
     // 6. Apply smoothing & gain
     float decayRates[4] = {0.60f, 0.60f, 0.60f, 0.60f};
-
-    // Note: Because we are taking the peak instead of average, the raw numbers
-    // will be inherently higher. I've lowered the base gains to compensate,
-    // but kept the high-frequency multipliers relatively strong.
-    // Tweak these if it's too sensitive!
     float gains[4] = {0.005f, 0.01f, 0.03f, 0.06f};
 
     for (int i = 0; i < 4; ++i) {
