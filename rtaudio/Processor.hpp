@@ -32,7 +32,7 @@ public:
   float prevMagnitudes[4] = {0, 0, 0, 0};
 
   AudioProcessor() {
-    // Set up for a 1024-sample FFT
+    // set up for a 1024-sample FFT
     n = 1024;
     log2n = log2f(n);
     nOver2 = n / 2;
@@ -44,21 +44,20 @@ public:
     imag.resize(nOver2);
     fftMags.resize(nOver2);
 
-    // Pre-calculate Hann window
+    // pre-calculate Hann window
     vDSP_hann_window(window.data(), n, vDSP_HANN_NORM);
   }
 
   ~AudioProcessor() { vDSP_destroy_fftsetup(fftSetup); }
 
   void process(const float *buffer, int totalSamples) {
-    int frames = totalSamples / 2; // stereo interleaved
-    if (frames <= 0)
+    if (totalSamples <= 0)
       return;
 
-    // convert incoming stereo frames to mono and append to circular buffer
-    for (int i = 0; i < frames; ++i) {
-      float sample = (buffer[2 * i] + buffer[2 * i + 1]) * 0.5f;
-      mono[writePos++] = sample;
+    // append the mono samples directly to the circular buffer
+    for (int i = 0; i < totalSamples; ++i) {
+      mono[writePos++] = buffer[i];
+
       if (writePos >= n) {
         // perform FFT on full buffer
         performFFT();
@@ -69,25 +68,23 @@ public:
 
 private:
   void performFFT() {
-    // 1. Apply Hann Window
+    // Apply Hann Window
     vDSP_vmul(mono.data(), 1, window.data(), 1, mono.data(), 1, n);
 
-    // 2. Prepare the Complex Buffer
+    // Prepare the Complex Buffer
     DSPSplitComplex complexBuffer;
     complexBuffer.realp = real.data();
     complexBuffer.imagp = imag.data();
     vDSP_ctoz((DSPComplex *)mono.data(), 2, &complexBuffer, 1, nOver2);
 
-    // 3. FFT!
+    // FFT time!
     vDSP_fft_zrip(fftSetup, &complexBuffer, 1, log2n, FFT_FORWARD);
 
-    // 4. Magnitudes
+    // Magnitudes
     vDSP_zvmags(&complexBuffer, 1, fftMags.data(), 1, nOver2);
 
-    // 5. Group into bands using vDSP (Hardware Accelerated)
     float raw[4] = {0, 0, 0, 0};
 
-    // Highly optimized lambda using Accelerate
     auto calculateBandPeak = [&](int startBin, int endBin) {
       float maxSquaredAmp = 0;
       vDSP_Length length = endBin - startBin + 1;
@@ -95,7 +92,7 @@ private:
       // Scan the array slice and find the maximum squared value instantly
       vDSP_maxv(&fftMags[startBin], 1, &maxSquaredAmp, length);
 
-      // Do the expensive square root operation ONLY ONCE per band
+      // Do the expensive square root operation, once per band
       return sqrtf(maxSquaredAmp);
     };
 
@@ -104,9 +101,10 @@ private:
     raw[2] = calculateBandPeak(43, 128);
     raw[3] = calculateBandPeak(129, 426);
 
-    // 6. Apply smoothing & gain
+    // Smoothing & gain (very empirical values, to make it look nice / similar
+    // to the iPhone's Dynamic Island waveform behavior)
     float decayRates[4] = {0.60f, 0.60f, 0.60f, 0.60f};
-    float gains[4] = {0.005f, 0.01f, 0.03f, 0.06f};
+    float gains[4] = {0.005f, 0.015f, 0.07f, 0.12f};
 
     for (int i = 0; i < 4; ++i) {
       float value = raw[i] * gains[i];

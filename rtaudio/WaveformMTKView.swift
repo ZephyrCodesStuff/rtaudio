@@ -8,7 +8,7 @@
 import Cocoa
 import MetalKit
 
-// This perfectly aligns with `struct WaveformParams` in Metal
+// WARN: this must align perfectly with `struct WaveformParams` in Metal!
 struct MetalWaveformParams {
     var magnitudes: (Float, Float, Float, Float)
     var viewportSize: SIMD2<Float>
@@ -26,7 +26,7 @@ class WaveformMTKView: MTKView, MTKViewDelegate {
 
     init(frame: CGRect, audio: SystemAudioScanner) {
         self.audio = audio
-        // Initialize with default metal device
+
         super.init(frame: frame, device: MTLCreateSystemDefaultDevice())
 
         self.delegate = self
@@ -109,6 +109,7 @@ class WaveformMTKView: MTKView, MTKViewDelegate {
         if let drawable = view.currentDrawable {
             commandBuffer.present(drawable)
         }
+
         commandBuffer.commit()
     }
 }
