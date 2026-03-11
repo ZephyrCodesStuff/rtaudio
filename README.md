@@ -1,6 +1,8 @@
 <div align="center">
 
-  <h1>🌊 rtaudio</h1>
+  <img src="rtaudio/Assets.xcassets/AppIcon.appiconset/Icon-iOS-Default-128x128@1x.png" alt="License">
+
+  <h1><code>rtaudio</code></h1>
 
   <p>
     <strong>A hyper-optimized, GPU-accelerated macOS system audio visualizer inspired by Apple's Dynamic Island.</strong>
