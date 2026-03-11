@@ -34,6 +34,16 @@ func getAppleMusicArtwork() -> NSImage? {
     return nil
 }
 
+func makeCornerMask(size: CGSize) -> NSImage {
+    let image = NSImage(size: size, flipped: false) { rect in
+        let bezierPath = NSBezierPath(roundedRect: rect, xRadius: 5, yRadius: 5)
+        NSColor.black.set()
+        bezierPath.fill()
+        return true
+    }
+    return image
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var panel: NSPanel!
     let audioScanner = SystemAudioScanner()
@@ -43,11 +53,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let height: CGFloat = 60
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        metalView = WaveformMTKView(
-            frame: NSRect(x: 0, y: 0, width: width, height: height),
-            audio: audioScanner
-        )
-
         panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -59,9 +64,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.level = .floating
+        panel.ignoresMouseEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-
-        panel.contentView = metalView
+        
+        let visualEffect = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        visualEffect.blendingMode = .behindWindow // Blurs the desktop/apps behind the panel
+        visualEffect.material = .hudWindow        // Dark, high-contrast frosted glass
+        visualEffect.state = .active              // Keep it blurred even when not in focus
+        visualEffect.maskImage = makeCornerMask(size: CGSize(width: width, height: height)) // Round the whole island
+        
+        metalView = WaveformMTKView(frame: visualEffect.bounds, audio: audioScanner)
+        metalView.autoresizingMask = [.width, .height]
+        
+        visualEffect.addSubview(metalView)
+        panel.contentView = visualEffect
+        
         panel.delegate = self
 
         guard let screen = NSScreen.main else { return }

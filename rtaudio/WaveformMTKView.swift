@@ -30,6 +30,9 @@ class WaveformMTKView: MTKView, MTKViewDelegate {
         super.init(frame: frame, device: MTLCreateSystemDefaultDevice())
 
         self.delegate = self
+        self.layerContentsRedrawPolicy = .duringViewResize
+        self.layer?.isOpaque = false
+        self.layer?.backgroundColor = NSColor.clear.cgColor
         self.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
         self.preferredFramesPerSecond = 30
         self.enableSetNeedsDisplay = false

@@ -77,9 +77,11 @@ fragment float4 waveform_fragment(RasterizerData in [[stage_in]],
         float d = sdRoundedBox(p, b, r);
         
         // If distance < 0, pixel is inside the bar: color it.
-        if (d < 0.0) {
-            finalColor = float4(1.0, 1.0, 1.0, 1.0);
-            break;
+        float alpha = smoothstep(0.75, -0.75, d);
+        
+        if (alpha > 0.0) {
+            // We use max() to blend overlapping alphas just in case
+            finalColor = float4(1.0, 1.0, 1.0, max(finalColor.a, alpha));
         }
     }
     
