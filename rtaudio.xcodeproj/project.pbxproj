@@ -298,7 +298,7 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = rtaudio/Info.plist;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "We use Apple Events to hook into Apple Music and request the album art, for the waveform's color.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access to show the cool 6-line waveform.";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -348,7 +348,7 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = rtaudio/Info.plist;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "We use Apple Events to hook into Apple Music and request the album art, for the waveform's color.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access to show the cool 6-line waveform.";
 				LD_RUNPATH_SEARCH_PATHS = (
