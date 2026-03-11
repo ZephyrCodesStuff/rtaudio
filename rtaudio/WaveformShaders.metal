@@ -12,6 +12,9 @@ using namespace metal;
 struct WaveformParams {
     float magnitudes[4];
     float2 viewportSize;
+    float backingScaleFactor;
+    float3 colorTop;
+    float3 colorBottom;
 };
 
 // Data passed from Vertex to Fragment
@@ -54,8 +57,8 @@ fragment float4 waveform_fragment(RasterizerData in [[stage_in]],
     // Core Graphics has Y=0 at the top, Metal has Y=0 at the bottom. Flip it.
     pixelCoord.y = params.viewportSize.y - pixelCoord.y;
     
-    float barWidth = 6.0;
-    float spacing = 8.0;
+    float barWidth = 6.0 / params.backingScaleFactor;
+    float spacing = 8.0 / params.backingScaleFactor;
     float totalWidth = 4.0 * barWidth + 3.0 * spacing;
     float startX = (params.viewportSize.x - totalWidth) / 2.0;
     
@@ -63,7 +66,7 @@ fragment float4 waveform_fragment(RasterizerData in [[stage_in]],
     
     for (int i = 0; i < 4; i++) {
         float rawValue = params.magnitudes[i];
-        float height = min(rawValue * 50.0 + 5.0, 160.0);
+        float height = min(rawValue * 50.0 / params.backingScaleFactor + 5.0 / params.backingScaleFactor, 160.0 / params.backingScaleFactor);
         
         // Find the center of _this_ specific bar
         float centerX = startX + float(i) * (barWidth + spacing) + (barWidth / 2.0);
@@ -79,9 +82,12 @@ fragment float4 waveform_fragment(RasterizerData in [[stage_in]],
         // If distance < 0, pixel is inside the bar: color it.
         float alpha = smoothstep(0.75, -0.75, d);
         
-        if (alpha > 0.0) {
-            // We use max() to blend overlapping alphas just in case
-            finalColor = float4(1.0, 1.0, 1.0, max(finalColor.a, alpha));
+        float gradientFactor = in.uv.y;
+        float3 mixedColor = mix(params.colorBottom, params.colorTop, gradientFactor);
+
+        // Apply the gradient to the bars
+        if (alpha > 0.0 && finalColor.a == 0.0) {
+            finalColor = float4(mixedColor, alpha);
         }
     }
     
