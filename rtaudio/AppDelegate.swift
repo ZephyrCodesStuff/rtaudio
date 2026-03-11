@@ -93,7 +93,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.level = .floating
-        panel.ignoresMouseEvents = true
+        panel.ignoresMouseEvents = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
         let backing = NSView(frame: NSRect(x: 0, y: 0, width: width, height: height))

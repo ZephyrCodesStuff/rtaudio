@@ -13,8 +13,8 @@ struct MetalWaveformParams {
     var magnitudes: (Float, Float, Float, Float)
     var viewportSize: SIMD2<Float>
     var backingScaleFactor: Float
-    var colorTop: SIMD3<Float>  // 🎨 Primary
-    var colorBottom: SIMD3<Float>  // 🎨 Secondary
+    var colorTop: SIMD3<Float>
+    var colorBottom: SIMD3<Float>
 }
 
 class WaveformMTKView: MTKView, MTKViewDelegate {
@@ -22,15 +22,18 @@ class WaveformMTKView: MTKView, MTKViewDelegate {
     var commandQueue: MTLCommandQueue?
     var pipelineState: MTLRenderPipelineState?
 
-    // Pretty album art-based coloring and transitioning
+    // Color transitioning
     private var colorTop = SIMD3<Float>(1, 1, 1)
     private var colorBottom = SIMD3<Float>(1, 1, 1)
     private var targetTop = SIMD3<Float>(1, 1, 1)
     private var targetBottom = SIMD3<Float>(1, 1, 1)
-    private var needsColorTransition = false  // lazy, please!
+    private var needsColorTransition = false
 
-    // Used to sync UI drawing with the screen's refresh rate
-    private var displayLink: CADisplayLink?
+    // Dragging state
+    private var isDragging = false
+    private var dragStart: NSPoint = .zero
+    private var trueOriginalWindowSize: CGSize = .zero
+    private var originalSizeInitialized = false
 
     func updateColors(top: SIMD3<Float>, bottom: SIMD3<Float>) {
         targetTop = top
@@ -42,48 +45,86 @@ class WaveformMTKView: MTKView, MTKViewDelegate {
         return a + (b - a) * t
     }
 
-    // We use this to manually pause the draw loop from the AppDelegate
     var isVisualizerPaused: Bool = false {
         didSet { self.isPaused = isVisualizerPaused }
     }
 
-    @objc private func renderTick(sender: CADisplayLink) {
-        // Check if we actually need to draw (Silence check)
-        let mags = audio.getSmoothedMagnitudes()
-        let activity = mags.reduce(0, +)
+    override func mouseDown(with event: NSEvent) {
+        isDragging = true
+        self.window?.invalidateCursorRects(for: self)
+        dragStart = event.locationInWindow
 
-        // Only trigger a draw if music is playing or colors are fading
-        if activity > 0.0001 || needsColorTransition {
-            self.draw(in: self)
+        guard let window = self.window else { return }
 
-            displayLink = self.window?.screen?.displayLink(
-                target: self, selector: #selector(renderTick))
+        if !originalSizeInitialized {
+            trueOriginalWindowSize = window.frame.size
+            originalSizeInitialized = true
+        }
 
-            // 3. Add to the main run loop so it fires alongside UI updates
-            displayLink?.add(to: .main, forMode: .common)
+        let scaleFactor: CGFloat = 0.92
+        let centerX = window.frame.midX
+        let centerY = window.frame.midY
+        let newWidth = window.frame.width * scaleFactor
+        let newHeight = window.frame.height * scaleFactor
+        let newX = centerX - newWidth / 2
+        let newY = centerY - newHeight / 2
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            window.animator().setFrame(
+                NSRect(x: newX, y: newY, width: newWidth, height: newHeight), display: true)
         }
     }
 
-    // User might move the window from a display to another:
-    // we need to renew the refresh rate since it might be outdated
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
+    override func mouseDragged(with event: NSEvent) {
+        guard isDragging, let window = self.window else { return }
 
-        displayLink?.invalidate()
+        let currentLocation = event.locationInWindow
+        let delta = NSPoint(
+            x: currentLocation.x - dragStart.x,
+            y: currentLocation.y - dragStart.y
+        )
+
+        let frame = window.frame
+        window.setFrame(
+            NSRect(
+                x: frame.origin.x + delta.x, y: frame.origin.y + delta.y, width: frame.width,
+                height: frame.height),
+            display: true
+        )
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        isDragging = false
+        self.window?.invalidateCursorRects(for: self)
+
+        guard let window = self.window else { return }
+
+        let currentFrame = window.frame
+        let centerX = currentFrame.midX
+        let centerY = currentFrame.midY
+        let newX = centerX - trueOriginalWindowSize.width / 2
+        let newY = centerY - trueOriginalWindowSize.height / 2
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.3
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            window.animator().setFrame(
+                NSRect(
+                    x: newX, y: newY, width: trueOriginalWindowSize.width,
+                    height: trueOriginalWindowSize.height), display: true)
+        }
     }
 
     init(frame: CGRect, audio: SystemAudioScanner) {
         self.audio = audio
         super.init(frame: frame, device: MTLCreateSystemDefaultDevice())
 
-        // Set delegate before configuring draw modes
         self.delegate = self
+        self.isPaused = false  // Let MTKView drive!
+        self.enableSetNeedsDisplay = false
 
-        // Manually control drawing via DisplayLink instead of the internal timer
-        self.isPaused = true
-        self.enableSetNeedsDisplay = false  // We will call draw(in:) directly
-
-        self.layerContentsRedrawPolicy = .duringViewResize
         self.layer?.isOpaque = false
         self.layer?.backgroundColor = NSColor.clear.cgColor
         self.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
@@ -128,49 +169,57 @@ class WaveformMTKView: MTKView, MTKViewDelegate {
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
     func draw(in view: MTKView) {
-        guard let commandBuffer = commandQueue?.makeCommandBuffer(),
-            let renderPassDescriptor = self.currentRenderPassDescriptor,
-            let pipelineState = pipelineState,
-            let renderEncoder = commandBuffer.makeRenderCommandEncoder(
-                descriptor: renderPassDescriptor)
-        else { return }
-
-        renderEncoder.setRenderPipelineState(pipelineState)
-
         let mags = audio.getSmoothedMagnitudes()
+        let activity = mags.reduce(0, +)
 
-        if needsColorTransition {
-            // Smoothly interpolate
-            colorTop = mix(colorTop, targetTop, t: 0.05)
-            colorBottom = mix(colorBottom, targetBottom, t: 0.05)
+        // If there is no audio and no animation happening, we return immediately.
+        // Because we don't call `currentDrawable`, Metal does 0 GPU work this frame.
+        if activity < 0.0001 && !needsColorTransition {
+            return
+        }
 
-            // If we are close enough to the target, snap and stop
-            if distance(colorTop, targetTop) < 0.001 && distance(colorBottom, targetBottom) < 0.001
-            {
-                colorTop = targetTop
-                colorBottom = targetBottom
-                needsColorTransition = false
-                print("🎨 Color transition complete. Math suspended.")
+        // This is mandatory for 120Hz loops to prevent CPU memory thrashing
+        autoreleasepool {
+            guard let commandBuffer = commandQueue?.makeCommandBuffer(),
+                let renderPassDescriptor = view.currentRenderPassDescriptor,
+                let pipelineState = pipelineState,
+                let renderEncoder = commandBuffer.makeRenderCommandEncoder(
+                    descriptor: renderPassDescriptor)
+            else { return }
+
+            renderEncoder.setRenderPipelineState(pipelineState)
+
+            if needsColorTransition {
+                colorTop = mix(colorTop, targetTop, t: 0.05)
+                colorBottom = mix(colorBottom, targetBottom, t: 0.05)
+
+                if distance(colorTop, targetTop) < 0.001
+                    && distance(colorBottom, targetBottom) < 0.001
+                {
+                    colorTop = targetTop
+                    colorBottom = targetBottom
+                    needsColorTransition = false
+                }
             }
+
+            var params = MetalWaveformParams(
+                magnitudes: (mags[0], mags[1], mags[2], mags[3]),
+                viewportSize: SIMD2<Float>(
+                    Float(view.drawableSize.width), Float(view.drawableSize.height)),
+                backingScaleFactor: Float(self.layer?.contentsScale ?? 1.0) * 1.5,
+                colorTop: colorTop,
+                colorBottom: colorBottom
+            )
+
+            renderEncoder.setFragmentBytes(
+                &params, length: MemoryLayout<MetalWaveformParams>.stride, index: 0)
+            renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+            renderEncoder.endEncoding()
+
+            if let drawable = view.currentDrawable {
+                commandBuffer.present(drawable)
+            }
+            commandBuffer.commit()
         }
-
-        var params = MetalWaveformParams(
-            magnitudes: (mags[0], mags[1], mags[2], mags[3]),
-            viewportSize: SIMD2<Float>(
-                Float(view.drawableSize.width), Float(view.drawableSize.height)),
-            backingScaleFactor: Float(self.layer?.contentsScale ?? 1.0) * 1.5,
-            colorTop: colorTop,
-            colorBottom: colorBottom
-        )
-
-        renderEncoder.setFragmentBytes(
-            &params, length: MemoryLayout<MetalWaveformParams>.stride, index: 0)
-        renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
-        renderEncoder.endEncoding()
-
-        if let drawable = view.currentDrawable {
-            commandBuffer.present(drawable)
-        }
-        commandBuffer.commit()
     }
 }

@@ -24,7 +24,7 @@
 
 > ℹ️ **Info**: `rtaudio` is _not really a "final product"_ but more of a _highly-optimized proof-of-concept_ for real-time audio visualization on macOS.
 >
-> The app bypasses SwiftUI entirely to avoid `AttributeGraph` diffing overhead. The real magic is how it hands 100% of the UI rendering to the GPU, making it possible to run an accurate remake of Apple's waveform visualizer, at near-zero CPU cost; even on battery power.
+> The app bypasses SwiftUI entirely to avoid `AttributeGraph` diffing overhead. The real magic is how it hands 100% of the UI rendering to the GPU, making it possible to run an accurate remake of Apple's waveform visualizer at near-zero CPU cost—even on battery power at 120Hz.
 >
 > **Feel free to include its techniques in your own project** (but _please give credit!_)
 
@@ -34,29 +34,32 @@
 
 Benchmarks using "Release" build mode currently show:
 
-- **CPU Usage**: Effectively **< 1%** CPU cycle usage (Instruments) and ~2.2% Wall Clock time while actively rendering at 30 FPS.
-- **Pause when Unused**: Hooks into `NSWindow.occlusionState` to automatically freeze the CoreAudio tap and Metal draw loop the millisecond the visualizer is covered or the screen locks, dropping usage to absolute **0.0%**.
+- **CPU Usage**: Effectively hovering around **~4%** Wall Clock time while actively rendering at a full 120Hz on ProMotion displays.
+- **Hardware-Synced Refresh**: Leverages optimized `MTKView` display links to perfectly match your active monitor's refresh rate, dropping to 60Hz on external displays to save power.
+- **Zero-Draw Bailout**: The Metal draw loop automatically detects audio silence and suspends GPU encoding. When music is paused, GPU usage flatlines to **0.0%**.
+- **Pause when Hidden**: Hooks into `NSWindow.occlusionState` to automatically freeze the CoreAudio tap when the visualizer is covered or the screen locks.
 - **Audio Processing**: Accelerate (`vDSP`) SIMD operations process 1024-sample mono FFTs and peak detection in fractions of a millisecond.
-- **Rendering**: Bypasses Apple's 2D path-drawing entirely. The waveform is drawn using mathematically perfect Signed Distance Fields (SDFs) directly in a Metal Fragment Shader.
 
 ## 🔧 Features & Tech Stack
 
 ### Core Features
 
-| Feature                    | Description                                                                                                                           |
-| :------------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
-| **Dynamic Island Physics** | 4-band frequency separation with asymmetric Attack/Release physics and 60 FPS Linear Interpolation (Lerp) tuned for raw audio.        |
-| **SDF Metal Shaders**      | Bypasses the CPU for UI rendering. GPU calculates waveform pixels in parallel using Signed Distance Fields.                           |
-| **CoreAudio PID Hunter**   | Scans `NSWorkspace` for specific running apps (Apple Music, Spotify), translates UNIX PIDs to HAL Object IDs, and taps them directly. |
+| Feature                 | Description                                                                                                                        |
+| :---------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+| **Dynamic Island UI**   | Features Apple's true OLED-black backgrounds and mathematically perfect SDF rendering.                                             |
+| **Event-Driven Colors** | Listens to Apple Music via `NSDistributedNotificationCenter` to extract dominant artwork colors and dynamically tint the bars.     |
+| **SDF Metal Shaders**   | Bypasses the CPU for UI rendering. The GPU calculates waveform pixels and animated blurs in parallel using Signed Distance Fields. |
+| **CoreAudio Tap**       | Scans `NSWorkspace` to only tap audio from specific running apps (Apple Music, Spotify).                                           |
 
 ### Technologies Used
 
-| Component            | Technology                                |
-| :------------------- | :---------------------------------------- |
-| **Audio Capture**    | `CoreAudio` (`CATap` / Aggregate Devices) |
-| **DSP & FFT**        | `Accelerate` / `vDSP` (C++)               |
-| **State Management** | `AppKit` (`NSWindowDelegate` occlusion)   |
-| **Rendering**        | `Metal` (`MTKView` / MSL Shaders)         |
+| Component            | Technology                                            |
+| :------------------- | :---------------------------------------------------- |
+| **Audio Capture**    | `CoreAudio` (`CATap` / Aggregate Devices)             |
+| **DSP & FFT**        | `Accelerate` / `vDSP` (C++)                           |
+| **Rendering**        | `Metal` (`MTKView` / MSL Shaders / SDFs)              |
+| **State Management** | `AppKit` (`NSWindowDelegate` occlusion / DisplayLink) |
+| **Inter-Process**    | `AppleScript` / `NSDistributedNotificationCenter`     |
 
 ## 💿 Getting Started
 

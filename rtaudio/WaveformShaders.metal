@@ -51,10 +51,7 @@ float sdRoundedBox(float2 p, float2 b, float r) {
 fragment float4 waveform_fragment(RasterizerData in [[stage_in]],
                                   constant WaveformParams &params [[buffer(0)]]) {
     
-    // Get the current pixel's exact X,Y coordinates
     float2 pixelCoord = in.uv * params.viewportSize;
-    
-    // Core Graphics has Y=0 at the top, Metal has Y=0 at the bottom. Flip it.
     pixelCoord.y = params.viewportSize.y - pixelCoord.y;
     
     float barWidth = 6.0 / params.backingScaleFactor;
@@ -62,34 +59,27 @@ fragment float4 waveform_fragment(RasterizerData in [[stage_in]],
     float totalWidth = 4.0 * barWidth + 3.0 * spacing;
     float startX = (params.viewportSize.x - totalWidth) / 2.0;
     
-    float4 finalColor = float4(0.0); // Transparent background
+    float totalAlpha = 0.0;
     
     for (int i = 0; i < 4; i++) {
         float rawValue = params.magnitudes[i];
         float height = min(rawValue * 50.0 / params.backingScaleFactor + 5.0 / params.backingScaleFactor, 160.0 / params.backingScaleFactor);
         
-        // Find the center of _this_ specific bar
         float centerX = startX + float(i) * (barWidth + spacing) + (barWidth / 2.0);
         float centerY = params.viewportSize.y / 2.0;
         
-        // Calculate the distance from this pixel to the bar
         float2 p = pixelCoord - float2(centerX, centerY);
         float2 b = float2(barWidth / 2.0, height / 2.0);
-        float r = barWidth / 2.0; // Corner radius is half width (Capsule)
+        float r = barWidth / 2.0;
         
         float d = sdRoundedBox(p, b, r);
-        
-        // If distance < 0, pixel is inside the bar: color it.
         float alpha = smoothstep(0.75, -0.75, d);
         
-        float gradientFactor = in.uv.y;
-        float3 mixedColor = mix(params.colorBottom, params.colorTop, gradientFactor);
-
-        // Apply the gradient to the bars
-        if (alpha > 0.0 && finalColor.a == 0.0) {
-            finalColor = float4(mixedColor, alpha);
-        }
+        totalAlpha = max(totalAlpha, alpha);
     }
     
-    return finalColor;
+    float gradientFactor = in.uv.y;
+    float3 mixedColor = mix(params.colorBottom, params.colorTop, gradientFactor);
+    
+    return float4(mixedColor, totalAlpha);
 }
