@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write # Required for GitHub Actions to create the release
+
+jobs:
+  build:
+    name: Build rtaudio
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build release
+        run: |
+          xcodebuild \
+            -scheme rtaudio \
+            -configuration Release \
+            -derivedDataPath build \
+            -arch arm64 \
+            -arch x86_64 \
+            build
+
+      - name: Archive app
+        run: |
+          ditto build/Build/Products/Release/rtaudio.app rtaudio.app
+
+      - name: Create DMG
+        run: |
+          mkdir dmg_temp
+          cp -r rtaudio.app dmg_temp/
+          hdiutil create -volname rtaudio -srcfolder dmg_temp -ov -format UDZO rtaudio.dmg
+          rm -rf dmg_temp
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtaudio-release
+          path: rtaudio.dmg
+          retention-days: 1
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required to fetch git history for the commit message
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Get latest commit message
+        id: commit_msg
+        run: |
+          # Grabs the last commit message and handles multi-line outputs safely
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "msg<<$EOF" >> $GITHUB_OUTPUT
+          git log -1 --pretty=%B >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+          # expose short SHA for use in the release name/tag
+          echo "short_sha=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # create a release/tag that points at the pushed commit (no pre-existing tag required)
+          tag_name: release-${{ steps.commit_msg.outputs.short_sha }}
+          target_commitish: ${{ github.sha }}
+          name: "🔖 Release #${{ steps.commit_msg.outputs.short_sha }}"
+          body: ${{ steps.commit_msg.outputs.msg }}
+          files: artifacts/rtaudio.dmg
