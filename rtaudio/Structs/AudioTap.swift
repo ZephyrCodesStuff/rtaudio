@@ -8,6 +8,7 @@
 import AppKit
 import AudioToolbox
 import CoreAudio
+import simd
 
 // Global variable to hold reference to the current scanner instance
 private var gCurrentScanner: AudioTap?
@@ -71,7 +72,7 @@ private func getAudioObjectID(for pid: pid_t) -> AudioObjectID? {
 class AudioTap: NSObject {
     let bridge = AudioBridge()
     var isPaused: Bool = false
-    private var displayMagnitudes: [Float] = [0, 0, 0, 0]
+    private var displayMagnitudes = simd_float4(0, 0, 0, 0)
 
     // CoreAudio stuff
     private var tapID: AudioObjectID = kAudioObjectUnknown
@@ -80,17 +81,15 @@ class AudioTap: NSObject {
     private var captureIsRunning = false
 
     // Helper function to smooth out the magnitudes for prettifying purposes
-    func getSmoothedMagnitudes() -> [Float] {
-        guard let targetLevels = bridge.getMagnitudes() as? [Float] else {
-            return displayMagnitudes
-        }
+    func getSmoothedMagnitudes() -> simd_float4 {
+        // Zero bridging overhead. Just passing 16 bytes of memory.
+        let targetLevels = bridge.getMagnitudes()
 
         let smoothingFactor: Float = 0.4
 
-        for i in 0..<4 {
-            let difference = targetLevels[i] - displayMagnitudes[i]
-            displayMagnitudes[i] += difference * smoothingFactor
-        }
+        // Vector math! This does all 4 calculations simultaneously.
+        let difference = targetLevels - displayMagnitudes
+        displayMagnitudes += difference * smoothingFactor
 
         return displayMagnitudes
     }

@@ -162,8 +162,8 @@ class WaveformMTKView: MTKView, MTKViewDelegate {
 
     func draw(in view: MTKView) {
         let mags = audio.getSmoothedMagnitudes()
-        let activity = mags.reduce(0, +)
-
+        let activity = mags.sum()
+        
         // If there is no audio and no animation happening, we return immediately.
         // Because we don't call `currentDrawable`, Metal does 0 GPU work this frame.
         if activity < 0.0001 && !needsColorTransition {

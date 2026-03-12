@@ -25,12 +25,12 @@
     processor->process(buffer, count);
 }
 
-- (NSArray<NSNumber *> *)getMagnitudes {
-    NSMutableArray *result = [NSMutableArray array];
-    for (int i = 0; i < 4; i++) {
-        [result addObject:@(processor->magnitudes[i])];
-    }
-    return result;
+- (simd_float4)getMagnitudes {
+    // This creates a vector directly in memory/registers. Zero heap allocation.
+    return simd_make_float4(processor->magnitudes[0],
+                            processor->magnitudes[1],
+                            processor->magnitudes[2],
+                            processor->magnitudes[3]);
 }
 
 - (void)dealloc {
