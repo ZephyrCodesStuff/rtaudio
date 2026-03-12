@@ -71,6 +71,7 @@ extension NSImage {
     }
 }
 
+@main
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var panel: NSPanel!
     let audioTap = AudioTap()
@@ -80,8 +81,40 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let height: CGFloat = 60
     let offsetX: CGFloat = 10
     let offsetY: CGFloat = 10
+    
+    // Menu bar entry
+    var statusItem: NSStatusItem!
+    
+    static func main() {
+        let app = NSApplication.shared
+        let delegate = AppDelegate()
+        app.delegate = delegate
+        app.run()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+        
+        // Initialize a Menu bar item
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+                
+        // TODO: custom icon (now we're using SF Symbols for convenience)
+        if let button = statusItem.button {
+            button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "rtaudio")
+        }
+
+        let menu = NSMenu()
+        menu.addItem(
+            NSMenuItem(
+                title: "Quit rtaudio",
+                action: #selector(NSApplication.terminate(_:)),
+                keyEquivalent: "q"
+            )
+        )
+        
+        statusItem.menu = menu
+        
+        // Create the actual app panel
         panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
             styleMask: [.borderless, .nonactivatingPanel],
