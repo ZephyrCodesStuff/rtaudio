@@ -7,8 +7,8 @@
 
 import AVFAudio
 import Cocoa
-import simd
 internal import MetalKit
+import simd
 
 func getAppleMusicArtwork() -> NSImage? {
     let script = """
@@ -208,8 +208,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         guard let screen = NSScreen.main else { return }
         let visibleFrame = screen.visibleFrame
-        let panelX = visibleFrame.maxX - width - offsetX
-        let panelY = visibleFrame.maxY - height - offsetY
+
+        // Restore window position or use default
+        var panelX = AppConfig.shared.windowPositionX
+        var panelY = AppConfig.shared.windowPositionY
+
+        if panelX == 0 && panelY == 0 {
+            // No saved position, use default (top-right corner)
+            panelX = visibleFrame.maxX - width - offsetX
+            panelY = visibleFrame.maxY - height - offsetY
+        }
+
         panel.setFrame(NSRect(x: panelX, y: panelY, width: width, height: height), display: true)
 
         panel.makeKeyAndOrderFront(nil)
@@ -280,6 +289,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             audioTap.isPaused = true
             metalView.isVisualizerPaused = true
         }
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        let frame = window.frame
+        AppConfig.shared.windowPositionX = frame.origin.x
+        AppConfig.shared.windowPositionY = frame.origin.y
     }
 
     @objc func setFrameRate(_ sender: NSMenuItem) {
