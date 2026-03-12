@@ -231,6 +231,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         menu.addItem(NSMenuItem.separator())
         menu.addItem(
             NSMenuItem(
+                title: "Reset Position",
+                action: #selector(resetWindowPosition),
+                keyEquivalent: ""
+            )
+        )
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(
+            NSMenuItem(
                 title: "Quit rtaudio",
                 action: #selector(NSApplication.terminate(_:)),
                 keyEquivalent: "q"
@@ -419,5 +427,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         // Apply frame rate to the Metal view
         metalView.preferredFramesPerSecond = frameRate
+    }
+
+    @objc func resetWindowPosition() {
+        // Clear saved position
+        AppConfig.shared.windowPositionX = 0
+        AppConfig.shared.windowPositionY = 0
+
+        // Reset to default position (top-right corner)
+        guard let screen = NSScreen.main else { return }
+        let visibleFrame = screen.visibleFrame
+        let panelX = visibleFrame.maxX - width - offsetX
+        let panelY = visibleFrame.maxY - height - offsetY
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().setFrame(
+                NSRect(x: panelX, y: panelY, width: width, height: height), display: true)
+        }
     }
 }
