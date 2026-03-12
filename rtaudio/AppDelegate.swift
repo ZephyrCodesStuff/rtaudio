@@ -12,6 +12,9 @@ import simd
 
 func getAppleMusicArtwork() -> NSImage? {
     let script = """
+        tell application "System Events"
+            if not (exists process "Music") then return ""
+        end tell
         tell application "Music"
             try
                 return raw data of artwork 1 of current track
@@ -20,13 +23,18 @@ func getAppleMusicArtwork() -> NSImage? {
         """
 
     // Apple Music returns the actual image data
-    guard let event = getArtwork(script: script) else { return nil }
+    guard let event = getArtwork(script: script), event.data.count > 0 else { return nil }
 
     return NSImage(data: event.data)
 }
 
 func getSpotifyArtwork() async -> NSImage? {
-    let script = "tell application \"Spotify\" to artwork url of current track"
+    let script = """
+        tell application "System Events"
+            if not (exists process "Spotify") then return ""
+        end tell
+        tell application "Spotify" to return artwork url of current track
+        """
 
     // Spotify returns the URL of the art
     guard let event = getArtwork(script: script),
@@ -75,42 +83,23 @@ func getArtwork(script: String) -> NSAppleEventDescriptor? {
 /// Returns the player that has playback state = playing.
 func detectActivePlayer() -> String? {
     for player in ["Music", "Spotify"] {
-        let script: String
-        if player == "Music" {
-            script = """
-                try
-                    tell application "Music"
-                        if player state is playing then
-                            return true
-                        end if
-                    end tell
-                end try
-                return false
-                """
-        } else {
-            script = """
-                try
-                    tell application "Spotify"
-                        if player state is playing then
-                            return true
-                        end if
-                    end tell
-                end try
-                return false
-                """
-        }
+        let script = """
+            tell application "System Events"
+                if not (exists process "\(player)") then return false
+            end tell
+            tell application "\(player)"
+                return player state is playing
+            end tell
+            """
 
         var error: NSDictionary?
         if let appleScript = NSAppleScript(source: script) {
             let descriptor = appleScript.executeAndReturnError(&error)
 
-            // Skip this player if there's an error (app not running, sandboxing issues, etc)
             if error != nil {
-                print("🎨 No access to \(player) player state")
                 continue
             }
 
-            // Check if the player returned true (is playing)
             if descriptor.booleanValue {
                 print("🎨 Detected active player: \(player)")
                 return player
@@ -189,23 +178,34 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var updateDebounceTimer: Timer?
     private let debounceInterval: TimeInterval = 0.3
 
+    // Strong reference to prevent ARC from deallocating the delegate
+    // (NSApplication.delegate is weak)
+    static var instance: AppDelegate!
+
     static func main() {
         let app = NSApplication.shared
-        let delegate = AppDelegate()
-        app.delegate = delegate
+        instance = AppDelegate()
+        app.delegate = instance
         app.run()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
-
         // Initialize a Menu bar item
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
-        // TODO: custom icon (now we're using SF Symbols for convenience)
         if let button = statusItem.button {
-            button.image = NSImage(
+            if let image = NSImage(
                 systemSymbolName: "waveform", accessibilityDescription: "rtaudio")
+            {
+                image.isTemplate = true  // Ensures it adapts to Dark/Light mode
+                image.size = NSSize(width: 18, height: 18)
+                button.image = image
+                button.imagePosition = .imageOnly
+                print("✅ Menu bar icon loaded (\(image.size))")
+            } else {
+                button.title = "RT"
+                print("⚠️ SF Symbol 'waveform' failed to load, using text fallback")
+            }
         }
 
         let menu = NSMenu()

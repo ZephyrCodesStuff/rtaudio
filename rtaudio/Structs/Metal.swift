@@ -7,7 +7,7 @@
 
 // WARN: this must align perfectly with `struct WaveformParams` in Metal!
 struct MetalWaveformParams {
-    var magnitudes: (Float, Float, Float, Float)
+    var magnitudes: SIMD4<Float>
     var viewportSize: SIMD2<Float>
     var backingScaleFactor: Float
     var colorTop: SIMD3<Float>
