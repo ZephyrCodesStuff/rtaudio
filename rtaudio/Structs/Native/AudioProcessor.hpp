@@ -104,7 +104,7 @@ private:
     // Smoothing & gain (very empirical values, to make it look nice / similar
     // to the iPhone's Dynamic Island waveform behavior)
     float decayRates[4] = {0.60f, 0.60f, 0.60f, 0.60f};
-    float gains[4] = {0.005f, 0.015f, 0.07f, 0.12f};
+    float gains[4] = {0.005f, 0.015f, 0.04f, 0.1f};
 
     for (int i = 0; i < 4; ++i) {
       float value = raw[i] * gains[i];
