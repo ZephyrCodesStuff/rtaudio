@@ -170,9 +170,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let offsetX: CGFloat = 10
     let offsetY: CGFloat = 10
 
-    // Menu bar entry
-    var statusItem: NSStatusItem!
-
     // Caching & debouncing for player detection
     private var cachedActivePlayer: String?
     private var updateDebounceTimer: Timer?
@@ -190,63 +187,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Initialize a Menu bar item
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-
-        if let button = statusItem.button {
-            if let image = NSImage(
-                systemSymbolName: "waveform", accessibilityDescription: "rtaudio")
-            {
-                image.isTemplate = true  // Ensures it adapts to Dark/Light mode
-                image.size = NSSize(width: 18, height: 18)
-                button.image = image
-                button.imagePosition = .imageOnly
-                print("✅ Menu bar icon loaded (\(image.size))")
-            } else {
-                button.title = "RT"
-                print("⚠️ SF Symbol 'waveform' failed to load, using text fallback")
-            }
-        }
-
-        let menu = NSMenu()
-
-        // Frame Rate submenu
-        let frameRateMenu = NSMenu()
-        for frameRate in AppConfig.frameRateOptions {
-            let item = NSMenuItem(
-                title: "\(frameRate) FPS",
-                action: #selector(setFrameRate(_:)),
-                keyEquivalent: ""
-            )
-            item.tag = frameRate
-            item.state = AppConfig.shared.frameRate == frameRate ? .on : .off
-            item.target = self
-            frameRateMenu.addItem(item)
-        }
-
-        let frameRateItem = NSMenuItem(title: "Frame Rate", action: nil, keyEquivalent: "")
-        frameRateItem.submenu = frameRateMenu
-        menu.addItem(frameRateItem)
-
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(
-            NSMenuItem(
-                title: "Reset Position",
-                action: #selector(resetWindowPosition),
-                keyEquivalent: ""
-            )
-        )
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(
-            NSMenuItem(
-                title: "Quit rtaudio",
-                action: #selector(NSApplication.terminate(_:)),
-                keyEquivalent: "q"
-            )
-        )
-
-        statusItem.menu = menu
-
         // Create the actual app panel
         panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
@@ -415,17 +355,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func setFrameRate(_ sender: NSMenuItem) {
         let frameRate = sender.tag
         AppConfig.shared.frameRate = frameRate
-
-        // Update menu item checkmarks
-        if let menu = statusItem.menu {
-            if let frameRateSubmenu = menu.item(withTitle: "Frame Rate")?.submenu {
-                for item in frameRateSubmenu.items {
-                    item.state = frameRate == item.tag ? .on : .off
-                }
-            }
-        }
-
-        // Apply frame rate to the Metal view
         metalView.preferredFramesPerSecond = frameRate
     }
 

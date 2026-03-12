@@ -127,6 +127,46 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
         }
     }
 
+    override func rightMouseDown(with event: NSEvent) {
+        let menu = NSMenu()
+
+        let frameRateMenu = NSMenu()
+        for frameRate in AppConfig.frameRateOptions {
+            let item = NSMenuItem(
+                title: "\(frameRate) FPS",
+                action: #selector(AppDelegate.setFrameRate(_:)),
+                keyEquivalent: ""
+            )
+            item.tag = frameRate
+            item.state = AppConfig.shared.frameRate == frameRate ? .on : .off
+            item.target = NSApp.delegate
+            frameRateMenu.addItem(item)
+        }
+
+        let frameRateItem = NSMenuItem(title: "Frame Rate", action: nil, keyEquivalent: "")
+        frameRateItem.submenu = frameRateMenu
+        menu.addItem(frameRateItem)
+
+        menu.addItem(NSMenuItem.separator())
+        let resetItem = NSMenuItem(
+            title: "Reset Position",
+            action: #selector(AppDelegate.resetWindowPosition),
+            keyEquivalent: ""
+        )
+        resetItem.target = NSApp.delegate
+        menu.addItem(resetItem)
+
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(
+            NSMenuItem(
+                title: "Quit rtaudio",
+                action: #selector(NSApplication.terminate(_:)),
+                keyEquivalent: ""
+            ))
+
+        NSMenu.popUpContextMenu(menu, with: event, for: self)
+    }
+
     override func makeBackingLayer() -> CALayer {
         CAMetalLayer()
     }
@@ -190,7 +230,7 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
         let fps = Float(AppConfig.shared.frameRate)
         let dl = CAMetalDisplayLink(metalLayer: metalLayer)
         dl.delegate = self
-        dl.preferredFrameRateRange = CAFrameRateRange(minimum: fps, maximum: fps, preferred: fps)
+        dl.preferredFrameRateRange = CAFrameRateRange(minimum: Float(AppConfig.frameRateOptions.first!), maximum: Float(AppConfig.frameRateOptions.last!), preferred: fps)
         dl.add(to: .main, forMode: .common)
         displayLink = dl
 
@@ -215,30 +255,32 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
         } catch {
             fatalError("🛑 METAL PIPELINE CRASH: \(error)")
         }
-        
+
         // 🔥 5. Spin up the Background Render Thread
         renderThread = Thread { [weak self] in
             guard let self = self else { return }
-            
+
             let fps = Float(AppConfig.shared.frameRate)
             let dl = CAMetalDisplayLink(metalLayer: self.metalLayer)
             dl.delegate = self
-            dl.preferredFrameRateRange = CAFrameRateRange(minimum: fps, maximum: fps, preferred: fps)
-            
+            dl.preferredFrameRateRange = CAFrameRateRange(
+                minimum: fps, maximum: fps, preferred: fps)
+
             // Attach to THIS background thread's runloop, NOT .main
             dl.add(to: .current, forMode: .default)
             self.displayLink = dl
-            
+
             // Keep the thread alive and listening to the Display Link
             RunLoop.current.run()
         }
-        
+
         renderThread?.name = "WaveformRenderThread"
         renderThread?.qualityOfService = .userInteractive
         renderThread?.start()
     }
 
-    func metalDisplayLink(_ link: CAMetalDisplayLink, needsUpdate update: CAMetalDisplayLink.Update) {
+    func metalDisplayLink(_ link: CAMetalDisplayLink, needsUpdate update: CAMetalDisplayLink.Update)
+    {
         let mags = audio.getSmoothedMagnitudes()
         let activity = mags.sum()
 
@@ -250,11 +292,13 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
             let renderPassDescriptor = MTLRenderPassDescriptor()
             renderPassDescriptor.colorAttachments[0].texture = update.drawable.texture
             renderPassDescriptor.colorAttachments[0].loadAction = .clear
-            renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+            renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
+                red: 0, green: 0, blue: 0, alpha: 0)
             renderPassDescriptor.colorAttachments[0].storeAction = .store
 
             guard let pipelineState = pipelineState,
-                  let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
+                let renderEncoder = commandBuffer.makeRenderCommandEncoder(
+                    descriptor: renderPassDescriptor)
             else { return }
 
             renderEncoder.setRenderPipelineState(pipelineState)
@@ -274,14 +318,15 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
 
             // 🔥 6. Use the Thread-Safe cached geometry, and pass the SIMD mags directly!
             var params = MetalWaveformParams(
-                magnitudes: mags, // No need for the tuple if your struct uses simd_float4
+                magnitudes: mags,  // No need for the tuple if your struct uses simd_float4
                 viewportSize: cachedViewport,
                 backingScaleFactor: cachedScaleFactor,
                 colorTop: colorTop,
                 colorBottom: colorBottom
             )
 
-            renderEncoder.setFragmentBytes(&params, length: MemoryLayout<MetalWaveformParams>.stride, index: 0)
+            renderEncoder.setFragmentBytes(
+                &params, length: MemoryLayout<MetalWaveformParams>.stride, index: 0)
             renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
             renderEncoder.endEncoding()
 
