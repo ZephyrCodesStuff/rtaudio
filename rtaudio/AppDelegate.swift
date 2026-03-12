@@ -183,6 +183,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // Menu bar entry
     var statusItem: NSStatusItem!
 
+    // Caching & debouncing for player detection
+    private var cachedActivePlayer: String?
+    private var updateDebounceTimer: Timer?
+    private let debounceInterval: TimeInterval = 0.3
+
     static func main() {
         let app = NSApplication.shared
         let delegate = AppDelegate()
@@ -299,7 +304,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             object: nil,
             queue: .main
         ) { _ in
-            self.updateArtworkColor()
+            self.debounceUpdateArtwork()
         }
 
         // Listen to Spotify notifications
@@ -308,6 +313,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             object: nil,
             queue: .main
         ) { _ in
+            self.debounceUpdateArtwork()
+        }
+    }
+
+    private func debounceUpdateArtwork() {
+        // Cancel any pending timer
+        updateDebounceTimer?.invalidate()
+        
+        // Schedule a new update after the debounce interval
+        updateDebounceTimer = Timer.scheduledTimer(withTimeInterval: debounceInterval, repeats: false) { _ in
             self.updateArtworkColor()
         }
     }
@@ -315,7 +330,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func updateArtworkColor() {
         // Wrap in a background Task so the AppleScript doesn't hang the UI thread
         Task(priority: .background) {
-            guard let activePlayer = detectActivePlayer() else {
+            // Always check for the current player (fast path if cached correctly)
+            let activePlayer = detectActivePlayer()
+            
+            // If the player changed from what we cached, clear the cache
+            if activePlayer != self.cachedActivePlayer {
+                self.cachedActivePlayer = activePlayer
+            }
+
+            guard let activePlayer = activePlayer else {
                 print("🎨 No music player detected")
                 return
             }

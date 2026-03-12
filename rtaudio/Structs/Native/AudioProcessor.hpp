@@ -54,12 +54,19 @@ public:
     if (totalSamples <= 0)
       return;
 
-    // append the mono samples directly to the circular buffer
-    for (int i = 0; i < totalSamples; ++i) {
-      mono[writePos++] = buffer[i];
+    int remaining = totalSamples;
+    const float *src = buffer;
+
+    while (remaining > 0) {
+      int space = n - writePos;
+      int toCopy = (remaining < space) ? remaining : space;
+
+      memcpy(&mono[writePos], src, toCopy * sizeof(float));
+      writePos += toCopy;
+      src += toCopy;
+      remaining -= toCopy;
 
       if (writePos >= n) {
-        // perform FFT on full buffer
         performFFT();
         writePos = 0;
       }
