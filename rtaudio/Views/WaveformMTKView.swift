@@ -193,11 +193,12 @@ class WaveformMTKView: MTKView, MTKViewDelegate {
                 }
             }
 
+            let scaleFactor = (self.drawableSize.width / self.bounds.width) * 0.7
             var params = MetalWaveformParams(
                 magnitudes: (mags[0], mags[1], mags[2], mags[3]),
                 viewportSize: SIMD2<Float>(
                     Float(view.drawableSize.width), Float(view.drawableSize.height)),
-                backingScaleFactor: Float(self.layer?.contentsScale ?? 1.0) * 0.5,
+                backingScaleFactor: Float(scaleFactor),
                 colorTop: colorTop,
                 colorBottom: colorBottom
             )

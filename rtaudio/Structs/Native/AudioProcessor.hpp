@@ -110,7 +110,7 @@ private:
       float value = raw[i] * gains[i];
       prevMagnitudes[i] =
           prevMagnitudes[i] * decayRates[i] + value * (1.0f - decayRates[i]);
-      magnitudes[i] = prevMagnitudes[i];
+      magnitudes[i] = fminf(prevMagnitudes[i], 1.0f);
     }
   }
 };

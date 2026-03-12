@@ -54,8 +54,8 @@ fragment float4 waveform_fragment(RasterizerData in [[stage_in]],
     float2 pixelCoord = in.uv * params.viewportSize;
     pixelCoord.y = params.viewportSize.y - pixelCoord.y;
     
-    float barWidth = 6.0 / params.backingScaleFactor;
-    float spacing = 8.0 / params.backingScaleFactor;
+    float barWidth = 6.0 * params.backingScaleFactor;
+    float spacing = 8.0 * params.backingScaleFactor;
     float totalWidth = 4.0 * barWidth + 3.0 * spacing;
     float startX = (params.viewportSize.x - totalWidth) / 2.0;
     
@@ -63,7 +63,7 @@ fragment float4 waveform_fragment(RasterizerData in [[stage_in]],
     
     for (int i = 0; i < 4; i++) {
         float rawValue = params.magnitudes[i];
-        float height = min(rawValue * 50.0 / params.backingScaleFactor + 5.0 / params.backingScaleFactor, 160.0 / params.backingScaleFactor);
+        float height = min(rawValue * 50.0 * params.backingScaleFactor + 5.0 * params.backingScaleFactor, 160.0 * params.backingScaleFactor);
         
         float centerX = startX + float(i) * (barWidth + spacing) + (barWidth / 2.0);
         float centerY = params.viewportSize.y / 2.0;
