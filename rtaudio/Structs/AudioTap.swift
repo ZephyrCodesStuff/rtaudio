@@ -80,6 +80,12 @@ class AudioTap: NSObject {
     private var ioProcID: AudioDeviceIOProcID? = nil
     private var captureIsRunning = false
 
+    private let targetBundleIDs = [
+        "com.apple.Music",
+        "com.spotify.client",
+        "com.apple.Safari",
+    ]
+
     // Helper function to smooth out the magnitudes for prettifying purposes
     func getSmoothedMagnitudes() -> simd_float4 {
         // Zero bridging overhead. Just passing 16 bytes of memory.
@@ -96,13 +102,6 @@ class AudioTap: NSObject {
 
     func startCapture() async {
         guard !captureIsRunning else { return }
-
-        // TODO: extract these in some way (as long as it's not hardcoded)
-        let targetBundleIDs = [
-            "com.apple.Music",
-            "com.spotify.client",
-            "com.apple.Safari",
-        ]
 
         let runningApps = NSWorkspace.shared.runningApplications
         var targetPIDs: [AudioDeviceID] = []
@@ -186,6 +185,13 @@ class AudioTap: NSObject {
 
         captureIsRunning = true
         print("🟢 CoreAudio CATap flowing through Aggregate Device!")
+    }
+
+    func restartCapture() {
+        Task {
+            stopCapture()
+            await startCapture()
+        }
     }
 
     func stopCapture() {

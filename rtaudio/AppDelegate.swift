@@ -268,6 +268,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             object: nil,
             queue: .main
         ) { _ in
+            self.audioTap.restartCapture()
             self.debounceUpdateArtwork()
         }
 
@@ -277,6 +278,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             object: nil,
             queue: .main
         ) { _ in
+            self.audioTap.restartCapture()
             self.debounceUpdateArtwork()
         }
     }
