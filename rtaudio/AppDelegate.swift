@@ -20,30 +20,39 @@ func getAppleMusicArtwork() -> NSImage? {
         """
 
     // Apple Music returns the actual image data
-    if let data = getArtwork(script: script) {
-        return NSImage(data: data)
-    }
-
-    return nil
+    guard let event = getArtwork(script: script) else { return nil }
+    
+    return NSImage(data: event.data)
 }
 
-func getSpotifyArtwork() -> NSImage? {
+func getSpotifyArtwork() async -> NSImage? {
     let script = "tell application \"Spotify\" to artwork url of current track"
 
     // Spotify returns the URL of the art
-    if let data = getArtwork(script: script) {
-        if let string = String(data: data, encoding: .utf8) {
-            if let url = URL(string: string), let data = try? Data(contentsOf: url) {
-                return NSImage(data: data)
-            }
+    guard let event = getArtwork(script: script),
+          let urlString = event.stringValue,
+          let url = URL(string: urlString) else { 
+        print("🎨 Failed to get or parse Spotify artwork URL")
+        return nil 
+    }
+
+    do {
+        let (data, _) = try await URLSession.shared.data(from: url)
+        if let image = NSImage(data: data) {
+            print("🎨 Successfully loaded Spotify artwork")
+            return image
+        } else {
+            print("🎨 Failed to create NSImage from Spotify URL data")
         }
+    } catch {
+        print("🎨 Failed to fetch Spotify artwork: \(error)")
     }
 
     return nil
 }
 
 /// Utility to call an AppleScript and return the result
-func getArtwork(script: String) -> Data? {
+func getArtwork(script: String) -> NSAppleEventDescriptor? {
     var error: NSDictionary?
     if let appleScript = NSAppleScript(source: script) {
         let output = appleScript.executeAndReturnError(&error)
@@ -53,7 +62,59 @@ func getArtwork(script: String) -> Data? {
             return nil
         }
 
-        return output.data
+        return output
+    }
+
+    return nil
+}
+
+/// Detect which music player is currently playing
+///
+/// Checks each player to see if it's actively playing.
+/// Returns the player that has playback state = playing.
+func detectActivePlayer() -> String? {
+    for player in ["Music", "Spotify"] {
+        let script: String
+        if player == "Music" {
+            script = """
+                try
+                    tell application "Music"
+                        if player state is playing then
+                            return true
+                        end if
+                    end tell
+                end try
+                return false
+                """
+        } else {
+            script = """
+                try
+                    tell application "Spotify"
+                        if player state is playing then
+                            return true
+                        end if
+                    end tell
+                end try
+                return false
+                """
+        }
+
+        var error: NSDictionary?
+        if let appleScript = NSAppleScript(source: script) {
+            let descriptor = appleScript.executeAndReturnError(&error)
+
+            // Skip this player if there's an error (app not running, sandboxing issues, etc)
+            if error != nil {
+                print("🎨 No access to \(player) player state")
+                continue
+            }
+
+            // Check if the player returned true (is playing)
+            if descriptor.booleanValue {
+                print("🎨 Detected active player: \(player)")
+                return player
+            }
+        }
     }
 
     return nil
@@ -232,9 +293,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func setupMusicObserver() {
-        // The OS only wakes us up when the track changes
+        // Listen to Apple Music notifications
         DistributedNotificationCenter.default().addObserver(
             forName: NSNotification.Name("com.apple.Music.playerInfo"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            self.updateArtworkColor()
+        }
+
+        // Listen to Spotify notifications
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.spotify.client.PlaybackStateChanged"),
             object: nil,
             queue: .main
         ) { _ in
@@ -245,36 +315,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func updateArtworkColor() {
         // Wrap in a background Task so the AppleScript doesn't hang the UI thread
         Task(priority: .background) {
-            let scriptSource =
-                "tell application \"Music\" to get raw data of artwork 1 of current track"
-            guard let script = NSAppleScript(source: scriptSource) else {
-                print("🎨 Failed to create AppleScript")
+            guard let activePlayer = detectActivePlayer() else {
+                print("🎨 No music player detected")
                 return
             }
 
-            var error: NSDictionary?
-            let descriptor = script.executeAndReturnError(&error)
-
-            if let error = error {
-                print("🎨 AppleScript error: \(error)")
-                return
-            }
-
-            guard descriptor.data.count > 0 else {
-                print("🎨 No artwork data available")
-                return
-            }
-
-            if let image = NSImage(data: descriptor.data) {
-                let (top, bottom) = image.getGradientColors()
-                print("🎨 Extracted colors - Top: \(top), Bottom: \(bottom)")
-
-                // Push the colors to the Metal View once
-                await MainActor.run {
-                    self.metalView.updateColors(top: top, bottom: bottom)
-                }
+            let image: NSImage?
+            if activePlayer == "Music" {
+                image = getAppleMusicArtwork()
+            } else if activePlayer == "Spotify" {
+                image = await getSpotifyArtwork()
             } else {
-                print("🎨 Failed to create NSImage from artwork data")
+                image = nil
+            }
+
+            guard let image = image else {
+                print("🎨 Failed to get artwork from \(activePlayer)")
+                return
+            }
+
+            let (top, bottom) = image.getGradientColors()
+            print("🎨 Extracted colors from \(activePlayer) - Top: \(top), Bottom: \(bottom)")
+
+            // Push the colors to the Metal View once
+            await MainActor.run {
+                self.metalView.updateColors(top: top, bottom: bottom)
             }
         }
     }
