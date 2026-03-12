@@ -1,5 +1,5 @@
 //
-//  SystemAudioScanner.swift
+//  AudioTap.swift
 //  rtaudio
 //
 //  Created by zeph on 11/03/26.
@@ -10,14 +10,14 @@ import AudioToolbox
 import CoreAudio
 
 // Global variable to hold reference to the current scanner instance
-private var gCurrentScanner: SystemAudioScanner?
+private var gCurrentScanner: AudioTap?
 
 // CoreAudio fires this on a high-priority background real-time thread.
 let audioIOProc: AudioDeviceIOProc = {
     inDevice, inNow, inInputData, inInputTime, outOutputData, inOutputTime, clientData in
 
     guard let clientData = clientData else { return noErr }
-    let scanner = Unmanaged<SystemAudioScanner>.fromOpaque(clientData).takeUnretainedValue()
+    let scanner = Unmanaged<AudioTap>.fromOpaque(clientData).takeUnretainedValue()
 
     if scanner.isPaused { return noErr }
 
@@ -42,7 +42,7 @@ private func getAudioObjectID(for pid: pid_t) -> AudioObjectID? {
     var pidValue = pid
 
     var address = AudioObjectPropertyAddress(
-        mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject,  // 🛑 The magic translator
+        mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject,
         mScope: kAudioObjectPropertyScopeGlobal,
         mElement: kAudioObjectPropertyElementMain
     )
@@ -68,7 +68,7 @@ private func getAudioObjectID(for pid: pid_t) -> AudioObjectID? {
     return nil
 }
 
-class SystemAudioScanner: NSObject {
+class AudioTap: NSObject {
     let bridge = AudioBridge()
     var isPaused: Bool = false
     private var displayMagnitudes: [Float] = [0, 0, 0, 0]

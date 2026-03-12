@@ -1,5 +1,5 @@
 //
-//  MetalWaveformParams.swift
+//  Metal.swift
 //  rtaudio
 //
 //  Created by zeph on 12/03/26.

@@ -73,7 +73,7 @@ extension NSImage {
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var panel: NSPanel!
-    let audioScanner = SystemAudioScanner()
+    let audioTap = AudioTap()
     var metalView: WaveformMTKView!
 
     let width: CGFloat = 135
@@ -107,7 +107,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         backing.layer?.shadowRadius = 2
         backing.layer?.shadowOffset = CGSize(width: 0, height: -1)
 
-        metalView = WaveformMTKView(frame: backing.bounds, audio: audioScanner)
+        metalView = WaveformMTKView(frame: backing.bounds, audio: audioTap)
         metalView.autoresizingMask = [.width, .height]
 
         backing.addSubview(metalView)
@@ -127,7 +127,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         updateArtworkColor()
 
         Task {
-            await audioScanner.startCapture()
+            await audioTap.startCapture()
         }
     }
 
@@ -183,10 +183,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard let window = notification.object as? NSWindow else { return }
 
         if window.occlusionState.contains(.visible) {
-            audioScanner.isPaused = false
+            audioTap.isPaused = false
             metalView.isVisualizerPaused = false
         } else {
-            audioScanner.isPaused = true
+            audioTap.isPaused = true
             metalView.isVisualizerPaused = true
         }
     }

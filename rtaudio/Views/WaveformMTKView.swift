@@ -9,7 +9,7 @@ import Cocoa
 import MetalKit
 
 class WaveformMTKView: MTKView, MTKViewDelegate {
-    var audio: SystemAudioScanner!
+    var audio: AudioTap!
     var commandQueue: MTLCommandQueue?
     var pipelineState: MTLRenderPipelineState?
 
@@ -108,7 +108,7 @@ class WaveformMTKView: MTKView, MTKViewDelegate {
         }
     }
 
-    init(frame: CGRect, audio: SystemAudioScanner) {
+    init(frame: CGRect, audio: AudioTap) {
         self.audio = audio
         super.init(frame: frame, device: MTLCreateSystemDefaultDevice())
 

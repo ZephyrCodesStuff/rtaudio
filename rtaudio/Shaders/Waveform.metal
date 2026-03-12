@@ -1,5 +1,5 @@
 //
-//  WaveformShaders.metal
+//  Waveform.metal
 //  rtaudio
 //
 //  Created by zeph on 11/03/26.
