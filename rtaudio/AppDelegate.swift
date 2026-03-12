@@ -8,6 +8,7 @@
 import AVFAudio
 import Cocoa
 import simd
+internal import MetalKit
 
 func getAppleMusicArtwork() -> NSImage? {
     let script = """
@@ -17,18 +18,18 @@ func getAppleMusicArtwork() -> NSImage? {
             end try
         end tell
         """
-    
+
     // Apple Music returns the actual image data
     if let data = getArtwork(script: script) {
         return NSImage(data: data)
     }
-    
+
     return nil
 }
 
 func getSpotifyArtwork() -> NSImage? {
     let script = "tell application \"Spotify\" to artwork url of current track"
-    
+
     // Spotify returns the URL of the art
     if let data = getArtwork(script: script) {
         if let string = String(data: data, encoding: .utf8) {
@@ -37,7 +38,7 @@ func getSpotifyArtwork() -> NSImage? {
             }
         }
     }
-    
+
     return nil
 }
 
@@ -141,6 +142,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
 
         let menu = NSMenu()
+
+        // Frame Rate submenu
+        let frameRateMenu = NSMenu()
+        for frameRate in AppConfig.frameRateOptions {
+            let item = NSMenuItem(
+                title: "\(frameRate) FPS",
+                action: #selector(setFrameRate(_:)),
+                keyEquivalent: ""
+            )
+            item.tag = frameRate
+            item.state = AppConfig.shared.frameRate == frameRate ? .on : .off
+            item.target = self
+            frameRateMenu.addItem(item)
+        }
+
+        let frameRateItem = NSMenuItem(title: "Frame Rate", action: nil, keyEquivalent: "")
+        frameRateItem.submenu = frameRateMenu
+        menu.addItem(frameRateItem)
+
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(
             NSMenuItem(
                 title: "Quit rtaudio",
@@ -259,5 +280,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             audioTap.isPaused = true
             metalView.isVisualizerPaused = true
         }
+    }
+
+    @objc func setFrameRate(_ sender: NSMenuItem) {
+        let frameRate = sender.tag
+        AppConfig.shared.frameRate = frameRate
+
+        // Update menu item checkmarks
+        if let menu = statusItem.menu {
+            if let frameRateSubmenu = menu.item(withTitle: "Frame Rate")?.submenu {
+                for item in frameRateSubmenu.items {
+                    item.state = frameRate == item.tag ? .on : .off
+                }
+            }
+        }
+
+        // Apply frame rate to the Metal view
+        metalView.preferredFramesPerSecond = frameRate
     }
 }
