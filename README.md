@@ -20,6 +20,22 @@
 
 - [@zeph](https://github.com/ZephyrCodesStuff) (that's me!)
 
+## ⚠️ READ ME: "I can't run the app!"
+
+By default, you might not be able to open the app. This is because of macOS's _Gatekeeper_ feature, blocking the app from running since it's not signed by a paid Apple Developer account's certificate.
+
+Don't worry, **you can easily bypass this**! To open the app, you need to:
+
+1. Drag and drop the app into your **Applications** folder
+2. Open a terminal
+3. Run the following command:
+
+```bash
+xattr -d com.apple.quarantine /Applications/rtaudio.app
+```
+
+After doing this, you should be able to open the app without any issues!
+
 ## 📖 Overview
 
 **rtaudio** is a computationally invisible, real-time macOS system audio visualizer. It drops deep into the macOS hardware stack to capture targeted application audio via kernel-level CoreAudio taps, performs a hardware-accelerated Fast Fourier Transform (FFT) in C++, and renders a buttery-smooth waveform entirely on the GPU using custom Metal fragment shaders.
