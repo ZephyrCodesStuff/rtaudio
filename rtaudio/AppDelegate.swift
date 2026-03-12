@@ -9,7 +9,6 @@ import AVFAudio
 import Cocoa
 import simd
 
-// TODO: use this?
 func getAppleMusicArtwork() -> NSImage? {
     let script = """
         tell application "Music"
@@ -18,7 +17,32 @@ func getAppleMusicArtwork() -> NSImage? {
             end try
         end tell
         """
+    
+    // Apple Music returns the actual image data
+    if let data = getArtwork(script: script) {
+        return NSImage(data: data)
+    }
+    
+    return nil
+}
 
+func getSpotifyArtwork() -> NSImage? {
+    let script = "tell application \"Spotify\" to artwork url of current track"
+    
+    // Spotify returns the URL of the art
+    if let data = getArtwork(script: script) {
+        if let string = String(data: data, encoding: .utf8) {
+            if let url = URL(string: string), let data = try? Data(contentsOf: url) {
+                return NSImage(data: data)
+            }
+        }
+    }
+    
+    return nil
+}
+
+/// Utility to call an AppleScript and return the result
+func getArtwork(script: String) -> Data? {
     var error: NSDictionary?
     if let appleScript = NSAppleScript(source: script) {
         let output = appleScript.executeAndReturnError(&error)
@@ -28,8 +52,7 @@ func getAppleMusicArtwork() -> NSImage? {
             return nil
         }
 
-        print(output.data)
-        return NSImage(data: output.data)
+        return output.data
     }
 
     return nil

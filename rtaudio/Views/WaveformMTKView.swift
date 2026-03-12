@@ -130,6 +130,9 @@ class WaveformMTKView: MTKView, MTKViewDelegate {
     private func setupMetal() {
         guard let device = self.device else { return }
         self.commandQueue = device.makeCommandQueue()
+        
+        // TODO: configurable!
+        self.preferredFramesPerSecond = 30
 
         let library = device.makeDefaultLibrary()
         let vertexFunction = library?.makeFunction(name: "waveform_vertex")
