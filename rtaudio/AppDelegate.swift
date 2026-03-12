@@ -21,7 +21,7 @@ func getAppleMusicArtwork() -> NSImage? {
 
     // Apple Music returns the actual image data
     guard let event = getArtwork(script: script) else { return nil }
-    
+
     return NSImage(data: event.data)
 }
 
@@ -30,10 +30,11 @@ func getSpotifyArtwork() async -> NSImage? {
 
     // Spotify returns the URL of the art
     guard let event = getArtwork(script: script),
-          let urlString = event.stringValue,
-          let url = URL(string: urlString) else { 
+        let urlString = event.stringValue,
+        let url = URL(string: urlString)
+    else {
         print("🎨 Failed to get or parse Spotify artwork URL")
-        return nil 
+        return nil
     }
 
     do {
@@ -279,8 +280,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         var panelX = AppConfig.shared.windowPositionX
         var panelY = AppConfig.shared.windowPositionY
 
-        if panelX == 0 && panelY == 0 {
-            // No saved position, use default (top-right corner)
+        // Check if saved position is valid (within any screen's bounds)
+        let savedPosIsValid =
+            panelX != 0 && panelY != 0
+            && {
+                let windowRect = NSRect(x: panelX, y: panelY, width: width, height: height)
+                // Check if window center is on any screen
+                for screen in NSScreen.screens {
+                    let scaledFrame = screen.visibleFrame
+                    if scaledFrame.contains(NSPoint(x: windowRect.midX, y: windowRect.midY)) {
+                        return true
+                    }
+                }
+                return false
+            }()
+
+        if !savedPosIsValid {
+            // No valid saved position, use default (top-right corner of main screen)
             panelX = visibleFrame.maxX - width - offsetX
             panelY = visibleFrame.maxY - height - offsetY
         }
@@ -320,9 +336,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func debounceUpdateArtwork() {
         // Cancel any pending timer
         updateDebounceTimer?.invalidate()
-        
+
         // Schedule a new update after the debounce interval
-        updateDebounceTimer = Timer.scheduledTimer(withTimeInterval: debounceInterval, repeats: false) { _ in
+        updateDebounceTimer = Timer.scheduledTimer(
+            withTimeInterval: debounceInterval, repeats: false
+        ) { _ in
             self.updateArtworkColor()
         }
     }
@@ -332,7 +350,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         Task(priority: .background) {
             // Always check for the current player (fast path if cached correctly)
             let activePlayer = detectActivePlayer()
-            
+
             // If the player changed from what we cached, clear the cache
             if activePlayer != self.cachedActivePlayer {
                 self.cachedActivePlayer = activePlayer
