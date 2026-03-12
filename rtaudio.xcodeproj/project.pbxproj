@@ -214,7 +214,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
-				SWIFT_OBJC_BRIDGING_HEADER = "rtaudio/rtaudio-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "rtaudio/Structs/Native/rtaudio-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
@@ -272,7 +272,7 @@
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_OBJC_BRIDGING_HEADER = "rtaudio/rtaudio-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "rtaudio/Structs/Native/rtaudio-Bridging-Header.h";
 			};
 			name = Release;
 		};

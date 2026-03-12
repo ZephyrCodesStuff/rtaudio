@@ -7,7 +7,7 @@
 
 
 #import "AudioBridge.h"
-#import "Processor.hpp"
+#import "AudioProcessor.hpp"
 
 @implementation AudioBridge {
     AudioProcessor *processor; // Internal C++ instance
