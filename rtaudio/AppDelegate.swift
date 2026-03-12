@@ -7,6 +7,7 @@
 
 import AVFAudio
 import Cocoa
+import simd
 
 // TODO: use this?
 func getAppleMusicArtwork() -> NSImage? {
@@ -54,20 +55,32 @@ extension NSImage {
         let color1 = bitmap.colorAt(x: 10, y: bitmap.pixelsHigh - 10)
         let color2 = bitmap.colorAt(x: bitmap.pixelsWide - 10, y: 10)
 
-        let c1 = SIMD3<Float>(
-            Float(color1?.redComponent ?? 1),
-            Float(color1?.greenComponent ?? 1),
-            Float(color1?.blueComponent ?? 1))
+        let c1 = ensureVisible(
+            SIMD3<Float>(
+                Float(color1?.redComponent ?? 1),
+                Float(color1?.greenComponent ?? 1),
+                Float(color1?.blueComponent ?? 1)))
 
-        let c2 = SIMD3<Float>(
-            Float(color2?.redComponent ?? 0.5),
-            Float(color2?.greenComponent ?? 0.5),
-            Float(color2?.blueComponent ?? 0.5))
+        let c2 = ensureVisible(
+            SIMD3<Float>(
+                Float(color2?.redComponent ?? 0.5),
+                Float(color2?.greenComponent ?? 0.5),
+                Float(color2?.blueComponent ?? 0.5)))
 
         print("🎨 Color1: R=\(c1.x) G=\(c1.y) B=\(c1.z)")
         print("🎨 Color2: R=\(c2.x) G=\(c2.y) B=\(c2.z)")
 
         return (c1, c2)
+    }
+
+    private func ensureVisible(_ color: SIMD3<Float>, minLuminance: Float = 0.25) -> SIMD3<Float> {
+        // These values are not random:
+        //  the human eye perceives brightness according to these ratios,
+        //  so we need to take them into account when calculating luminance.
+        let luminance = 0.2126 * color.x + 0.7152 * color.y + 0.0722 * color.z
+        guard luminance > 0, luminance < minLuminance else { return color }
+        let scaled = color * (minLuminance / luminance)
+        return simd_min(scaled, SIMD3<Float>(1, 1, 1))
     }
 }
 
@@ -81,10 +94,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let height: CGFloat = 60
     let offsetX: CGFloat = 10
     let offsetY: CGFloat = 10
-    
+
     // Menu bar entry
     var statusItem: NSStatusItem!
-    
+
     static func main() {
         let app = NSApplication.shared
         let delegate = AppDelegate()
@@ -94,13 +107,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
-        
+
         // Initialize a Menu bar item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-                
+
         // TODO: custom icon (now we're using SF Symbols for convenience)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "rtaudio")
+            button.image = NSImage(
+                systemSymbolName: "waveform", accessibilityDescription: "rtaudio")
         }
 
         let menu = NSMenu()
@@ -111,9 +125,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 keyEquivalent: "q"
             )
         )
-        
+
         statusItem.menu = menu
-        
+
         // Create the actual app panel
         panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
