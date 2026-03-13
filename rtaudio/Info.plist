@@ -6,5 +6,10 @@
 		<true />
 		<key>NSAudioCaptureUsageDescription</key>
 		<string>This app needs to capture system audio for displaying the waveform.</string>
+		<key>SUFeedURL</key>
+		<string>
+			https://raw.githubusercontent.com/ZephyrCodesStuff/rtaudio-updater/refs/heads/main/appcast.xml</string>
+		<key>SUPublicEDKey</key>
+		<string>cqFRi1a5mwPMBGu47gW01S0FwPsQJapmeHQuq4cnXL0=</string>
 	</dict>
 </plist>

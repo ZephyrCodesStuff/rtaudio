@@ -53,11 +53,25 @@ jobs:
           hdiutil create -volname rtaudio -srcfolder dmg_temp -ov -format UDZO rtaudio.dmg
           rm -rf dmg_temp
 
+      - name: Download and extract Sparkle
+        run: |
+          cd /tmp
+          curl -L https://github.com/sparkle-project/Sparkle/releases/download/2.9.0/Sparkle-2.9.0.tar.xz | tar xJ
+
+      - name: Generate Sparkle appcast
+        run: |
+          echo "${{ secrets.SPARKLE_PRIVATE_KEY }}" | /tmp/bin/generate_appcast \
+            --ed-key-file - \
+            -o appcast.xml \
+            ./rtaudio.dmg
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: rtaudio-release
-          path: rtaudio.dmg
+          path: |
+            rtaudio.dmg
+            appcast.xml
           retention-days: 1
 
   release:
@@ -87,6 +101,17 @@ jobs:
           # expose short SHA for use in the release name/tag
           echo "short_sha=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
 
+      - name: Push appcast to rtaudio-updater repo
+        run: |
+          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/rtaudio-updater.git updater
+          cp artifacts/appcast.xml updater/appcast.xml
+          cd updater
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git add appcast.xml
+          git commit -m "Update appcast for release-${{ steps.commit_msg.outputs.short_sha }}" || true
+          git push
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -95,4 +120,6 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: "🔖 Release #${{ steps.commit_msg.outputs.short_sha }}"
           body: ${{ steps.commit_msg.outputs.msg }}
-          files: artifacts/rtaudio.dmg
+          files: |
+            artifacts/rtaudio.dmg
+            artifacts/appcast.xml

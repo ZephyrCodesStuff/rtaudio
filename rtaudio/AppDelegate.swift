@@ -9,6 +9,7 @@ import AVFAudio
 import Cocoa
 internal import MetalKit
 import simd
+import Sparkle
 
 func getAppleMusicArtwork() -> NSImage? {
     let script = """
@@ -164,6 +165,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var panel: NSPanel!
     let audioTap = AudioTap()
     var metalView: WaveformMTKView!
+    private var updaterController: SPUStandardUpdaterController!
 
     let width: CGFloat = 135
     let height: CGFloat = 60
@@ -186,7 +188,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         app.run()
     }
 
+    @objc func checkForUpdates() {
+        updaterController.checkForUpdates(nil)
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        updaterController = SPUStandardUpdaterController(
+            startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
         // Create the actual app panel
         panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
