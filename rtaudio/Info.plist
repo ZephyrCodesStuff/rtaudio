@@ -6,5 +6,9 @@
 		<true />
 		<key>NSAudioCaptureUsageDescription</key>
 		<string>This app needs to capture system audio for displaying the waveform.</string>
+		<key>SUFeedURL</key>
+		<string>https://raw.githubusercontent.com/zephkelly/rtaudio/main/appcast.xml</string>
+		<key>SUPublicEDKey</key>
+		<string><!-- Run `generate_keys` from Sparkle's bin/ and paste your public key here --></string>
 	</dict>
 </plist>

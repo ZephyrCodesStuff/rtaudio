@@ -157,6 +157,15 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
         menu.addItem(resetItem)
 
         menu.addItem(NSMenuItem.separator())
+        let updateItem = NSMenuItem(
+            title: "Check for Updates...",
+            action: #selector(AppDelegate.checkForUpdates),
+            keyEquivalent: ""
+        )
+        updateItem.target = NSApp.delegate
+        menu.addItem(updateItem)
+
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(
             NSMenuItem(
                 title: "Quit rtaudio",
