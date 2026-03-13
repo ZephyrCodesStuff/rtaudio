@@ -60,7 +60,7 @@ jobs:
 
       - name: Generate Sparkle appcast
         run: |
-          echo "${{ secrets.SPARKLE_PRIVATE_KEY }}" | /tmp/Sparkle-2.9.0/bin/generate_appcast \
+          echo "${{ secrets.SPARKLE_PRIVATE_KEY }}" | /tmp/bin/generate_appcast \
             --ed-key-file - \
             -o appcast.xml \
             ./rtaudio.dmg
