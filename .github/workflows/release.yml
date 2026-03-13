@@ -28,17 +28,19 @@ jobs:
 
       - name: Set Version Numbers
         run: |
-          # Sets the Build Number (CFBundleVersion) to the unique GitHub Action run number
-          xcrun symptoms --display  # Ensure tools are warmed up
+          # Define the path to your Info.plist
+          # Ensure this path matches your folder structure (e.g., "rtaudio/Info.plist")
           PLIST="rtaudio/Info.plist"
 
-          # Update the Build Number to the unique CI run count
+          echo "Updating $PLIST with Build Number: ${{ github.run_number }}"
+
+          # 1. Update the Build Number (CFBundleVersion)
+          # Sparkle uses this to detect if an update is newer.
           plutil -replace CFBundleVersion -string "${{ github.run_number }}" "$PLIST"
 
-          # Optionally, append the run number to the marketing version for clarity
-          # e.g., "1.0.0 (Build 42)"
-          MARKETING_VER=$(plutil -extract CFBundleShortVersionString raw "$PLIST")
-          echo "Building Version: $MARKETING_VER (Build ${{ github.run_number }})"
+          # 2. Verify the change (Optional but helpful for debugging logs)
+          NEW_VAL=$(plutil -extract CFBundleVersion raw "$PLIST")
+          echo "Verified CFBundleVersion is now: $NEW_VAL"
 
       - name: Build release
         run: |
