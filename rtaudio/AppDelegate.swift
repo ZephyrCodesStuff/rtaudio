@@ -193,8 +193,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Initialize Sparkle updater
         updaterController = SPUStandardUpdaterController(
             startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+
         // Create the actual app panel
         panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
