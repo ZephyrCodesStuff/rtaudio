@@ -26,6 +26,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set Version Numbers
+        run: |
+          # Sets the Build Number (CFBundleVersion) to the unique GitHub Action run number
+          xcrun symptoms --display  # Ensure tools are warmed up
+          PLIST="rtaudio/Info.plist"
+
+          # Update the Build Number to the unique CI run count
+          plutil -replace CFBundleVersion -string "${{ github.run_number }}" "$PLIST"
+
+          # Optionally, append the run number to the marketing version for clarity
+          # e.g., "1.0.0 (Build 42)"
+          MARKETING_VER=$(plutil -extract CFBundleShortVersionString raw "$PLIST")
+          echo "Building Version: $MARKETING_VER (Build ${{ github.run_number }})"
+
       - name: Build release
         run: |
           xcodebuild \
