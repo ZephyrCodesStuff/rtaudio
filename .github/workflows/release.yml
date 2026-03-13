@@ -26,24 +26,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set Version Numbers
-        run: |
-          # Define the path to your Info.plist
-          # Ensure this path matches your folder structure (e.g., "rtaudio/Info.plist")
-          PLIST="rtaudio/Info.plist"
-
-          echo "Updating $PLIST with Build Number: ${{ github.run_number }}"
-
-          # 1. Update CFBundleVersion (used by Sparkle to detect newer updates)
-          plutil -replace CFBundleVersion -string "${{ github.run_number }}" "$PLIST"
-
-          # 2. Update CFBundleShortVersionString (displayed to users in the update prompt)
-          plutil -replace CFBundleShortVersionString -string "1.${{ github.run_number }}" "$PLIST"
-
-          # 3. Verify
-          echo "CFBundleVersion: $(plutil -extract CFBundleVersion raw $PLIST)"
-          echo "CFBundleShortVersionString: $(plutil -extract CFBundleShortVersionString raw $PLIST)"
-
       - name: Build release
         run: |
           xcodebuild \
@@ -53,10 +35,18 @@ jobs:
             -arch arm64 \
             -arch x86_64 \
             MACOSX_DEPLOYMENT_TARGET=15.5 \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            MARKETING_VERSION=1.${{ github.run_number }} \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_ENTITLEMENTS="" \
             build
+
+      - name: Verify built app version for Sparkle
+        run: |
+          BUILT_PLIST="build/Build/Products/Release/rtaudio.app/Contents/Info.plist"
+          echo "Built CFBundleVersion: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$BUILT_PLIST")"
+          echo "Built CFBundleShortVersionString: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$BUILT_PLIST")"
 
       - name: Archive app
         run: |
