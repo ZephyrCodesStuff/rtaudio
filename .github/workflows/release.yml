@@ -60,10 +60,12 @@ jobs:
 
       - name: Generate Sparkle appcast
         run: |
-          echo "${{ secrets.SPARKLE_PRIVATE_KEY }}" | /tmp/bin/generate_appcast \
+          mkdir -p sparkle_updates
+          cp ./rtaudio.dmg ./sparkle_updates/
+          printf '%s' "${{ secrets.SPARKLE_PRIVATE_KEY }}" | /tmp/bin/generate_appcast \
             --ed-key-file - \
             -o appcast.xml \
-            ./rtaudio.dmg
+            ./sparkle_updates
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
