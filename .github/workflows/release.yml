@@ -53,13 +53,14 @@ jobs:
           hdiutil create -volname rtaudio -srcfolder dmg_temp -ov -format UDZO rtaudio.dmg
           rm -rf dmg_temp
 
-      - name: Install Sparkle tools
+      - name: Download and extract Sparkle
         run: |
-          brew install sparkle
+          cd /tmp
+          curl -L https://github.com/sparkle-project/Sparkle/releases/download/2.9.0/Sparkle-2.9.0.tar.xz | tar xJ
 
       - name: Generate Sparkle appcast
         run: |
-          echo "${{ secrets.SPARKLE_PRIVATE_KEY }}" | generate_appcast \
+          echo "${{ secrets.SPARKLE_PRIVATE_KEY }}" | /tmp/Sparkle-2.9.0/bin/generate_appcast \
             --ed-key-file - \
             -o appcast.xml \
             ./rtaudio.dmg
