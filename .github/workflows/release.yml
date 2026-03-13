@@ -81,6 +81,7 @@ jobs:
 
   release:
     name: Create Release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -107,8 +108,14 @@ jobs:
           echo "short_sha=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
 
       - name: Push appcast to rtaudio-updater repo
+        env:
+          UPDATER_REPO_TOKEN: ${{ secrets.UPDATER_REPO_TOKEN }}
         run: |
-          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/rtaudio-updater.git updater
+          if [ -z "$UPDATER_REPO_TOKEN" ]; then
+            echo "Missing required secret: UPDATER_REPO_TOKEN"
+            exit 1
+          fi
+          git clone https://x-access-token:${UPDATER_REPO_TOKEN}@github.com/${{ github.repository_owner }}/rtaudio-updater.git updater
           cp artifacts/appcast.xml updater/appcast.xml
           cd updater
           git config user.email "action@github.com"
