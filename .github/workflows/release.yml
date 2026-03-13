@@ -34,13 +34,15 @@ jobs:
 
           echo "Updating $PLIST with Build Number: ${{ github.run_number }}"
 
-          # 1. Update the Build Number (CFBundleVersion)
-          # Sparkle uses this to detect if an update is newer.
+          # 1. Update CFBundleVersion (used by Sparkle to detect newer updates)
           plutil -replace CFBundleVersion -string "${{ github.run_number }}" "$PLIST"
 
-          # 2. Verify the change (Optional but helpful for debugging logs)
-          NEW_VAL=$(plutil -extract CFBundleVersion raw "$PLIST")
-          echo "Verified CFBundleVersion is now: $NEW_VAL"
+          # 2. Update CFBundleShortVersionString (displayed to users in the update prompt)
+          plutil -replace CFBundleShortVersionString -string "1.${{ github.run_number }}" "$PLIST"
+
+          # 3. Verify
+          echo "CFBundleVersion: $(plutil -extract CFBundleVersion raw $PLIST)"
+          echo "CFBundleShortVersionString: $(plutil -extract CFBundleShortVersionString raw $PLIST)"
 
       - name: Build release
         run: |
@@ -79,10 +81,13 @@ jobs:
 
       - name: Generate Sparkle appcast
         run: |
+          SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/release-${SHORT_SHA}/"
           mkdir -p sparkle_updates
           cp ./rtaudio.dmg ./sparkle_updates/
           printf '%s' "${{ secrets.SPARKLE_PRIVATE_KEY }}" | /tmp/bin/generate_appcast \
             --ed-key-file - \
+            --download-url-prefix "${DOWNLOAD_URL}" \
             -o appcast.xml \
             ./sparkle_updates
 
