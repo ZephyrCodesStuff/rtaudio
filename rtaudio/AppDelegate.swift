@@ -8,8 +8,8 @@
 import AVFAudio
 import Cocoa
 internal import MetalKit
-import simd
 import Sparkle
+import simd
 
 func getAppleMusicArtwork() -> NSImage? {
     let script = """
