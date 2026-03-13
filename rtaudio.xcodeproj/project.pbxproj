@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		264F33942F64499800C1E2AB /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 264F33932F64499800C1E2AB /* Sparkle */; };
 		266C88832F605EEB00139B20 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 266C88822F605EEB00139B20 /* Accelerate.framework */; };
 /* End PBXBuildFile section */
 
@@ -42,6 +43,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				266C88832F605EEB00139B20 /* Accelerate.framework in Frameworks */,
+				264F33942F64499800C1E2AB /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -93,6 +95,7 @@
 			);
 			name = rtaudio;
 			packageProductDependencies = (
+				264F33932F64499800C1E2AB /* Sparkle */,
 			);
 			productName = rtaudio;
 			productReference = 266C88662F605B8600139B20 /* rtaudio.app */;
@@ -123,6 +126,9 @@
 			);
 			mainGroup = 266C885D2F605B8600139B20;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				264F33922F64499800C1E2AB /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 266C88672F605B8600139B20 /* Products */;
 			projectDirPath = "";
@@ -399,6 +405,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		264F33922F64499800C1E2AB /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		264F33932F64499800C1E2AB /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 264F33922F64499800C1E2AB /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 266C885E2F605B8600139B20 /* Project object */;
 }
