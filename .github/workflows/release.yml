@@ -44,6 +44,11 @@ jobs:
         run: |
           ditto build/Build/Products/Release/rtaudio.app rtaudio.app
 
+      - name: Ad-hoc sign app for Sparkle validation
+        run: |
+          codesign --force --deep --sign - rtaudio.app
+          codesign --verify --deep --strict rtaudio.app
+
       - name: Create DMG
         run: |
           mkdir dmg_temp
