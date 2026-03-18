@@ -77,20 +77,21 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
             let fps = Float(preferredFramesPerSecond)
             renderThread.map { thread in
                 // perform(_:on:) executes on that thread's runloop
-                perform(#selector(applyFrameRate(_:)),
-                        on: thread,
-                        with: fps as NSNumber,
-                        waitUntilDone: false)
+                perform(
+                    #selector(applyFrameRate(_:)),
+                    on: thread,
+                    with: fps as NSNumber,
+                    waitUntilDone: false)
             }
         }
     }
-    
+
     @objc private func applyFrameRate(_ fps: NSNumber) {
         let f = fps.floatValue
         displayLink?.preferredFrameRateRange = CAFrameRateRange(
             minimum: f, maximum: f, preferred: f)
     }
-    
+
     override func mouseDown(with event: NSEvent) {
         isDragging = true
         self.window?.invalidateCursorRects(for: self)
@@ -250,14 +251,16 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
         let newHeight = bounds.height * scale
         metalLayer.drawableSize = CGSize(width: newWidth, height: newHeight)
 
-        let geo = (SIMD2<Float>(Float(newWidth), Float(newHeight)),
-                   bounds.width > 0 ? Float((newWidth / bounds.width) * 0.7) : 1.0)
+        let geo = (
+            SIMD2<Float>(Float(newWidth), Float(newHeight)),
+            bounds.width > 0 ? Float((newWidth / bounds.width) * 0.7) : 1.0
+        )
         cachedGeometry = geo
     }
-    
+
     private func setupPipeline(device: MTLDevice) {
         let library = device.makeDefaultLibrary()
-        
+
         let pipelineDescriptor = MTLRenderPipelineDescriptor()
         pipelineDescriptor.vertexFunction = library?.makeFunction(name: "waveform_vertex")
         pipelineDescriptor.fragmentFunction = library?.makeFunction(name: "waveform_fragment")
@@ -288,15 +291,16 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
         metalLayer.pixelFormat = .bgra8Unorm
         metalLayer.isOpaque = false
         metalLayer.framebufferOnly = true
-        
+
         renderPassDescriptor.colorAttachments[0].loadAction = .clear
-        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
+            red: 0, green: 0, blue: 0, alpha: 0)
         renderPassDescriptor.colorAttachments[0].storeAction = .store
 
         setupPipeline(device: device)
         startRenderThread()
     }
-    
+
     private func startRenderThread() {
         renderThread = Thread { [weak self] in
             guard let self else { return }
@@ -320,22 +324,17 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
         renderThread?.start()
     }
 
-    func metalDisplayLink(_ link: CAMetalDisplayLink, needsUpdate update: CAMetalDisplayLink.Update) {
+    func metalDisplayLink(_ link: CAMetalDisplayLink, needsUpdate update: CAMetalDisplayLink.Update)
+    {
         let mags = audio.getSmoothedMagnitudes()
         let activity = mags.sum()
         let isIdle = activity < 0.0001 && !needsColorTransition
 
-        // True idle: don't touch the drawable at all
         if isIdle {
-            idleFrameCount += 1
-            if idleFrameCount >= idleFrameThreshold {
-                displayLink?.isPaused = true  // zero CPU until audio resumes
-            }
+            // If we already drew the black frame, abort immediately.
             if hasRenderedBlankFrame { return }
             hasRenderedBlankFrame = true
         } else {
-            idleFrameCount = 0
-            displayLink?.isPaused = false
             hasRenderedBlankFrame = false
         }
 
@@ -354,24 +353,26 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
                 )
             }
 
-            // Acquire drawable as late as possible — minimises stall window
             guard let commandBuffer = commandQueue?.makeCommandBuffer() else { return }
 
-            // NOW access the drawable
-            let rpd = MTLRenderPassDescriptor()
-            rpd.colorAttachments[0].texture = update.drawable.texture
-            rpd.colorAttachments[0].loadAction = .clear
-            rpd.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
-            rpd.colorAttachments[0].storeAction = .store
+            renderPassDescriptor.colorAttachments[0].texture = update.drawable.texture
 
             if let pipelineState,
-               let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: rpd) {
+                let renderEncoder = commandBuffer.makeRenderCommandEncoder(
+                    descriptor: renderPassDescriptor)
+            {
 
                 renderEncoder.setRenderPipelineState(pipelineState)
-                renderEncoder.setFragmentBytes(&params,
-                    length: MemoryLayout<MetalWaveformParams>.stride,
-                    index: 0)
-                renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+
+                // Only bind bytes and draw if we actually have params
+                if params != nil {
+                    renderEncoder.setFragmentBytes(
+                        &params,
+                        length: MemoryLayout<MetalWaveformParams>.stride,
+                        index: 0)
+                    renderEncoder.drawPrimitives(
+                        type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+                }
                 renderEncoder.endEncoding()
             }
 
@@ -379,14 +380,14 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
             commandBuffer.commit()
         }
     }
-    
+
     private func updateColors() {
         guard needsColorTransition else { return }
-        colorTop    = mix(colorTop,    targetTop,    t: 0.05)
+        colorTop = mix(colorTop, targetTop, t: 0.05)
         colorBottom = mix(colorBottom, targetBottom, t: 0.05)
 
         if distance(colorTop, targetTop) < 0.001 && distance(colorBottom, targetBottom) < 0.001 {
-            colorTop    = targetTop
+            colorTop = targetTop
             colorBottom = targetBottom
             needsColorTransition = false
         }
