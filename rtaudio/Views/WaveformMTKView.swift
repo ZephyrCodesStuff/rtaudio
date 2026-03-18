@@ -15,14 +15,35 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
     private var metalLayer: CAMetalLayer!
     private var commandQueue: MTLCommandQueue?
     private var pipelineState: MTLRenderPipelineState?
+    private let renderPassDescriptor = MTLRenderPassDescriptor()
     private var displayLink: CAMetalDisplayLink?
 
     // 🔥 1. The new Background Thread
     private var renderThread: Thread?
+    private var hasRenderedBlankFrame = false
+    private var idleFrameCount = 0
+    private let idleFrameThreshold = 10  // ~330ms at 30fps
 
     // 🔥 2. Thread-safe cached geometry
-    private var cachedViewport = SIMD2<Float>(0, 0)
-    private var cachedScaleFactor: Float = 1.0
+    private var geometryLock = os_unfair_lock_s()
+    private var _cachedViewport = SIMD2<Float>(0, 0)
+    private var _cachedScaleFactor: Float = 1.0
+
+    private var cachedGeometry: (viewport: SIMD2<Float>, scale: Float) {
+        get {
+            os_unfair_lock_lock(&geometryLock)
+            let v = _cachedViewport
+            let s = _cachedScaleFactor
+            os_unfair_lock_unlock(&geometryLock)
+            return (v, s)
+        }
+        set {
+            os_unfair_lock_lock(&geometryLock)
+            _cachedViewport = newValue.viewport
+            _cachedScaleFactor = newValue.scale
+            os_unfair_lock_unlock(&geometryLock)
+        }
+    }
 
     // Color transitioning
     private var colorTop = SIMD3<Float>(1, 1, 1)
@@ -54,11 +75,22 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
     var preferredFramesPerSecond: Int = 30 {
         didSet {
             let fps = Float(preferredFramesPerSecond)
-            displayLink?.preferredFrameRateRange = CAFrameRateRange(
-                minimum: fps, maximum: fps, preferred: fps)
+            renderThread.map { thread in
+                // perform(_:on:) executes on that thread's runloop
+                perform(#selector(applyFrameRate(_:)),
+                        on: thread,
+                        with: fps as NSNumber,
+                        waitUntilDone: false)
+            }
         }
     }
-
+    
+    @objc private func applyFrameRate(_ fps: NSNumber) {
+        let f = fps.floatValue
+        displayLink?.preferredFrameRateRange = CAFrameRateRange(
+            minimum: f, maximum: f, preferred: f)
+    }
+    
     override func mouseDown(with event: NSEvent) {
         isDragging = true
         self.window?.invalidateCursorRects(for: self)
@@ -218,32 +250,14 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
         let newHeight = bounds.height * scale
         metalLayer.drawableSize = CGSize(width: newWidth, height: newHeight)
 
-        // 🔥 4. Safely cache geometry on the Main Thread for the background thread to use
-        cachedViewport = SIMD2<Float>(Float(newWidth), Float(newHeight))
-        if bounds.width > 0 {
-            cachedScaleFactor = Float((newWidth / bounds.width) * 0.7)
-        }
+        let geo = (SIMD2<Float>(Float(newWidth), Float(newHeight)),
+                   bounds.width > 0 ? Float((newWidth / bounds.width) * 0.7) : 1.0)
+        cachedGeometry = geo
     }
-
-    private func setupMetal() {
-        guard let device = MTLCreateSystemDefaultDevice() else {
-            fatalError("🛑 Metal is not supported")
-        }
-        commandQueue = device.makeCommandQueue()
-
-        metalLayer.device = device
-        metalLayer.pixelFormat = .bgra8Unorm
-        metalLayer.isOpaque = false
-        metalLayer.framebufferOnly = true
-
-        let fps = Float(AppConfig.shared.frameRate)
-        let dl = CAMetalDisplayLink(metalLayer: metalLayer)
-        dl.delegate = self
-        dl.preferredFrameRateRange = CAFrameRateRange(minimum: Float(AppConfig.frameRateOptions.first!), maximum: Float(AppConfig.frameRateOptions.last!), preferred: fps)
-        dl.add(to: .main, forMode: .common)
-        displayLink = dl
-
+    
+    private func setupPipeline(device: MTLDevice) {
         let library = device.makeDefaultLibrary()
+        
         let pipelineDescriptor = MTLRenderPipelineDescriptor()
         pipelineDescriptor.vertexFunction = library?.makeFunction(name: "waveform_vertex")
         pipelineDescriptor.fragmentFunction = library?.makeFunction(name: "waveform_fragment")
@@ -264,83 +278,117 @@ class WaveformMTKView: NSView, CAMetalDisplayLinkDelegate {
         } catch {
             fatalError("🛑 METAL PIPELINE CRASH: \(error)")
         }
+    }
 
-        // 🔥 5. Spin up the Background Render Thread
+    private func setupMetal() {
+        guard let device = MTLCreateSystemDefaultDevice() else { fatalError() }
+        commandQueue = device.makeCommandQueue()
+
+        metalLayer.device = device
+        metalLayer.pixelFormat = .bgra8Unorm
+        metalLayer.isOpaque = false
+        metalLayer.framebufferOnly = true
+        
+        renderPassDescriptor.colorAttachments[0].loadAction = .clear
+        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+        renderPassDescriptor.colorAttachments[0].storeAction = .store
+
+        setupPipeline(device: device)
+        startRenderThread()
+    }
+    
+    private func startRenderThread() {
         renderThread = Thread { [weak self] in
-            guard let self = self else { return }
+            guard let self else { return }
 
             let fps = Float(AppConfig.shared.frameRate)
             let dl = CAMetalDisplayLink(metalLayer: self.metalLayer)
             dl.delegate = self
             dl.preferredFrameRateRange = CAFrameRateRange(
-                minimum: fps, maximum: fps, preferred: fps)
-
-            // Attach to THIS background thread's runloop, NOT .main
+                minimum: Float(AppConfig.frameRateOptions.first!),
+                maximum: Float(AppConfig.frameRateOptions.last!),
+                preferred: fps)
             dl.add(to: .current, forMode: .default)
-            self.displayLink = dl
 
-            // Keep the thread alive and listening to the Display Link
+            // Store before running — isPaused setter needs it
+            DispatchQueue.main.async { self.displayLink = dl }
+
             RunLoop.current.run()
         }
-
         renderThread?.name = "WaveformRenderThread"
         renderThread?.qualityOfService = .userInteractive
         renderThread?.start()
     }
 
-    func metalDisplayLink(_ link: CAMetalDisplayLink, needsUpdate update: CAMetalDisplayLink.Update)
-    {
+    func metalDisplayLink(_ link: CAMetalDisplayLink, needsUpdate update: CAMetalDisplayLink.Update) {
         let mags = audio.getSmoothedMagnitudes()
         let activity = mags.sum()
+        let isIdle = activity < 0.0001 && !needsColorTransition
 
-        if activity < 0.0001 && !needsColorTransition { return }
+        // True idle: don't touch the drawable at all
+        if isIdle {
+            idleFrameCount += 1
+            if idleFrameCount >= idleFrameThreshold {
+                displayLink?.isPaused = true  // zero CPU until audio resumes
+            }
+            if hasRenderedBlankFrame { return }
+            hasRenderedBlankFrame = true
+        } else {
+            idleFrameCount = 0
+            displayLink?.isPaused = false
+            hasRenderedBlankFrame = false
+        }
 
         autoreleasepool {
-            guard let commandBuffer = commandQueue?.makeCommandBuffer() else { return }
+            let currentGeo = cachedGeometry
+            var params: MetalWaveformParams?
 
-            let renderPassDescriptor = MTLRenderPassDescriptor()
-            renderPassDescriptor.colorAttachments[0].texture = update.drawable.texture
-            renderPassDescriptor.colorAttachments[0].loadAction = .clear
-            renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
-                red: 0, green: 0, blue: 0, alpha: 0)
-            renderPassDescriptor.colorAttachments[0].storeAction = .store
-
-            guard let pipelineState = pipelineState,
-                let renderEncoder = commandBuffer.makeRenderCommandEncoder(
-                    descriptor: renderPassDescriptor)
-            else { return }
-
-            renderEncoder.setRenderPipelineState(pipelineState)
-
-            if needsColorTransition {
-                colorTop = mix(colorTop, targetTop, t: 0.05)
-                colorBottom = mix(colorBottom, targetBottom, t: 0.05)
-
-                if distance(colorTop, targetTop) < 0.001
-                    && distance(colorBottom, targetBottom) < 0.001
-                {
-                    colorTop = targetTop
-                    colorBottom = targetBottom
-                    needsColorTransition = false
-                }
+            if !isIdle {
+                updateColors()
+                params = MetalWaveformParams(
+                    magnitudes: mags,
+                    viewportSize: currentGeo.viewport,
+                    backingScaleFactor: currentGeo.scale,
+                    colorTop: colorTop,
+                    colorBottom: colorBottom
+                )
             }
 
-            // 🔥 6. Use the Thread-Safe cached geometry, and pass the SIMD mags directly!
-            var params = MetalWaveformParams(
-                magnitudes: mags,  // No need for the tuple if your struct uses simd_float4
-                viewportSize: cachedViewport,
-                backingScaleFactor: cachedScaleFactor,
-                colorTop: colorTop,
-                colorBottom: colorBottom
-            )
+            // Acquire drawable as late as possible — minimises stall window
+            guard let commandBuffer = commandQueue?.makeCommandBuffer() else { return }
 
-            renderEncoder.setFragmentBytes(
-                &params, length: MemoryLayout<MetalWaveformParams>.stride, index: 0)
-            renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
-            renderEncoder.endEncoding()
+            // NOW access the drawable
+            let rpd = MTLRenderPassDescriptor()
+            rpd.colorAttachments[0].texture = update.drawable.texture
+            rpd.colorAttachments[0].loadAction = .clear
+            rpd.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+            rpd.colorAttachments[0].storeAction = .store
+
+            if let pipelineState,
+               let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: rpd) {
+
+                renderEncoder.setRenderPipelineState(pipelineState)
+                renderEncoder.setFragmentBytes(&params,
+                    length: MemoryLayout<MetalWaveformParams>.stride,
+                    index: 0)
+                renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+                renderEncoder.endEncoding()
+            }
 
             commandBuffer.present(update.drawable)
             commandBuffer.commit()
+        }
+    }
+    
+    private func updateColors() {
+        guard needsColorTransition else { return }
+        colorTop    = mix(colorTop,    targetTop,    t: 0.05)
+        colorBottom = mix(colorBottom, targetBottom, t: 0.05)
+
+        if distance(colorTop, targetTop) < 0.001 && distance(colorBottom, targetBottom) < 0.001 {
+            colorTop    = targetTop
+            colorBottom = targetBottom
+            needsColorTransition = false
         }
     }
 }

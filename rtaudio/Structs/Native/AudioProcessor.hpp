@@ -1,125 +1,121 @@
-//
-//  AudioProcessor.hpp
-//  rtaudio
-//
-//  Created by zeph on 10/03/26.
-//
-
 #ifndef Processor_hpp
 #define Processor_hpp
 
 #include <Accelerate/Accelerate.h>
+#include <atomic>
 #include <cmath>
-#include <vector>
 
 class AudioProcessor {
 private:
-  FFTSetup fftSetup;
-  vDSP_Length log2n;
-  int n, nOver2;
-  int writePos = 0; // how many mono samples have been buffered
+    static constexpr int   kBlockSize = 512;   // lower latency than 1024
+    static constexpr int   kBands     = 4;
+    static constexpr float kAttack    = 0.85f; // fast rise
+    static constexpr float kRelease   = 0.40f; // slower fall — more musical
+    static constexpr float kGains[kBands] = {3.5f, 6.0f, 9.0f, 20.0f};
 
-  // Pre-allocated buffers to prevent audio dropouts (no mallocs in process
-  // loop!)
-  std::vector<float> mono;
-  std::vector<float> window;
-  std::vector<float> real;
-  std::vector<float> imag;
-  std::vector<float> fftMags;
+    float    sampleRate;
+    int      writePos = 0;
+    float    mono[kBlockSize]      = {};
+    float    filtered[kBlockSize]  = {};
+
+    vDSP_biquad_Setup setups[kBands];
+    alignas(16) float delays[kBands][4] = {};
+
+    float envelopes[kBands] = {};
+
+    // Lock-free: audio thread writes, render thread reads
+    // One atomic per band — fits in a cache line
+    alignas(64) std::atomic<float> bandParams[kBands] = {};
 
 public:
-  float magnitudes[4] = {0, 0, 0, 0};
-  float prevMagnitudes[4] = {0, 0, 0, 0};
-
-  AudioProcessor() {
-    // set up for a 1024-sample FFT
-    n = 1024;
-    log2n = log2f(n);
-    nOver2 = n / 2;
-    fftSetup = vDSP_create_fftsetup(log2n, FFT_RADIX2);
-
-    mono.resize(n);
-    window.resize(n);
-    real.resize(nOver2);
-    imag.resize(nOver2);
-    fftMags.resize(nOver2);
-
-    // pre-calculate Hann window
-    vDSP_hann_window(window.data(), n, vDSP_HANN_NORM);
-  }
-
-  ~AudioProcessor() { vDSP_destroy_fftsetup(fftSetup); }
-
-  void process(const float *buffer, int totalSamples) {
-    if (totalSamples <= 0)
-      return;
-
-    int remaining = totalSamples;
-    const float *src = buffer;
-
-    while (remaining > 0) {
-      int space = n - writePos;
-      int toCopy = (remaining < space) ? remaining : space;
-
-      memcpy(&mono[writePos], src, toCopy * sizeof(float));
-      writePos += toCopy;
-      src += toCopy;
-      remaining -= toCopy;
-
-      if (writePos >= n) {
-        performFFT();
-        writePos = 0;
-      }
+    explicit AudioProcessor(float sr = 48000.0f) : sampleRate(sr) {
+        // Single biquad per band — just enough separation, minimal CPU
+        setupBiquad(0, FilterType::LowPass,  250.0f,  0.707f);
+        setupBiquad(1, FilterType::BandPass, 707.0f,  0.40f);
+        setupBiquad(2, FilterType::BandPass, 3464.0f, 0.85f);
+        setupBiquad(3, FilterType::HighPass, 6000.0f, 0.707f);
     }
-  }
+
+    ~AudioProcessor() {
+        for (int i = 0; i < kBands; ++i)
+            vDSP_biquad_DestroySetup(setups[i]);
+    }
+
+    // Called by CoreAudio — must be real-time safe (no alloc, no locks)
+    void process(const float* __restrict__ buffer, int totalSamples) {
+        if (__builtin_expect(totalSamples <= 0, 0)) return;
+
+        const float* src = buffer;
+        int remaining = totalSamples;
+
+        while (remaining > 0) {
+            int toCopy = std::min(remaining, kBlockSize - writePos);
+            memcpy(mono + writePos, src, toCopy * sizeof(float));
+            writePos  += toCopy;
+            src       += toCopy;
+            remaining -= toCopy;
+
+            if (writePos >= kBlockSize) {
+                processBlock();
+                writePos = 0;
+            }
+        }
+    }
+
+    // Called by render thread — lock-free read
+    float getBand(int i) const {
+        return bandParams[i].load(std::memory_order_relaxed);
+    }
 
 private:
-  void performFFT() {
-    // Apply Hann Window
-    vDSP_vmul(mono.data(), 1, window.data(), 1, mono.data(), 1, n);
+    enum class FilterType { LowPass, BandPass, HighPass };
 
-    // Prepare the Complex Buffer
-    DSPSplitComplex complexBuffer;
-    complexBuffer.realp = real.data();
-    complexBuffer.imagp = imag.data();
-    vDSP_ctoz((DSPComplex *)mono.data(), 2, &complexBuffer, 1, nOver2);
+    void processBlock() {
+        for (int i = 0; i < kBands; ++i) {
+            vDSP_biquad(setups[i], delays[i], mono, 1, filtered, 1, kBlockSize);
 
-    // FFT time!
-    vDSP_fft_zrip(fftSetup, &complexBuffer, 1, log2n, FFT_FORWARD);
+            // RMS over the block — more stable than peak for driving animation
+            float rms = 0.0f;
+            vDSP_rmsqv(filtered, 1, &rms, kBlockSize);
 
-    // Magnitudes
-    vDSP_zvmags(&complexBuffer, 1, fftMags.data(), 1, nOver2);
+            if (__builtin_expect(!std::isfinite(rms), 0)) rms = 0.0f;
+            
+            float boostedRms = rms * kGains[i];
+            boostedRms = std::min(boostedRms, 1.0f);
 
-    float raw[4] = {0, 0, 0, 0};
+            // Asymmetric envelope: attack fast, release slow
+            float prev = envelopes[i];
+            envelopes[i] = (boostedRms > prev)
+                ? prev * (1.0f - kAttack)  + boostedRms * kAttack
+                : prev * (1.0f - kRelease) + boostedRms * kRelease;
 
-    auto calculateBandPeak = [&](int startBin, int endBin) {
-      float maxSquaredAmp = 0;
-      vDSP_Length length = endBin - startBin + 1;
-
-      // Scan the array slice and find the maximum squared value instantly
-      vDSP_maxv(&fftMags[startBin], 1, &maxSquaredAmp, length);
-
-      // Do the expensive square root operation, once per band
-      return sqrtf(maxSquaredAmp);
-    };
-
-    raw[0] = calculateBandPeak(1, 5);
-    raw[1] = calculateBandPeak(6, 42);
-    raw[2] = calculateBandPeak(43, 128);
-    raw[3] = calculateBandPeak(129, 426);
-
-    // Smoothing & gain (very empirical values, to make it look nice / similar
-    // to the iPhone's Dynamic Island waveform behavior)
-    float decayRates[4] = {0.60f, 0.60f, 0.60f, 0.60f};
-    float gains[4] = {0.005f, 0.015f, 0.04f, 0.1f};
-
-    for (int i = 0; i < 4; ++i) {
-      float value = raw[i] * gains[i];
-      prevMagnitudes[i] =
-          prevMagnitudes[i] * decayRates[i] + value * (1.0f - decayRates[i]);
-      magnitudes[i] = fminf(prevMagnitudes[i], 1.0f);
+            bandParams[i].store(envelopes[i], std::memory_order_relaxed);
+        }
     }
-  }
+
+    void setupBiquad(int idx, FilterType type, float freq, float q) {
+        const double w0    = 2.0 * M_PI * freq / sampleRate;
+        const double sinw  = std::sin(w0);
+        const double cosw  = std::cos(w0);
+        const double alpha = sinw / (2.0 * q);
+
+        double b0, b1, b2;
+        const double a0 =  1.0 + alpha;
+        const double a1 = -2.0 * cosw;
+        const double a2 =  1.0 - alpha;
+
+        switch (type) {
+            case FilterType::LowPass:
+                b0 = (1.0 - cosw) * 0.5; b1 = 1.0 - cosw; b2 = b0; break;
+            case FilterType::HighPass:
+                b0 = (1.0 + cosw) * 0.5; b1 = -(1.0 + cosw); b2 = b0; break;
+            case FilterType::BandPass:
+                b0 = alpha; b1 = 0.0; b2 = -alpha; break;
+        }
+
+        const double coeffs[5] = { b0/a0, b1/a0, b2/a0, a1/a0, a2/a0 };
+        setups[idx] = vDSP_biquad_CreateSetup(coeffs, 1);
+    }
 };
 
-#endif /* Processor_hpp */
+#endif // !Processor_hpp

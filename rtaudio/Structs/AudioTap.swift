@@ -89,7 +89,7 @@ class AudioTap: NSObject {
     // Helper function to smooth out the magnitudes for prettifying purposes
     func getSmoothedMagnitudes() -> simd_float4 {
         // Zero bridging overhead. Just passing 16 bytes of memory.
-        let targetLevels = bridge.getMagnitudes()
+        let targetLevels = bridge.getSmoothedMagnitudes()
 
         let smoothingFactor: Float = 0.4
 

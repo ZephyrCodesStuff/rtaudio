@@ -8,7 +8,15 @@
 #import <Foundation/Foundation.h>
 #import <simd/simd.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface AudioBridge : NSObject
-- (void)processBuffer:(float *)buffer count:(int)count;
-- (simd_float4)getMagnitudes;
+
+- (void)processBuffer:(const float *)buffer count:(int)count;
+
+// Reads atomically from the processor — safe to call from any thread
+- (simd_float4)getSmoothedMagnitudes;
+
 @end
+
+NS_ASSUME_NONNULL_END

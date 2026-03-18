@@ -10,7 +10,7 @@
 #import "AudioProcessor.hpp"
 
 @implementation AudioBridge {
-    AudioProcessor *processor; // Internal C++ instance
+    AudioProcessor *processor;
 }
 
 - (instancetype)init {
@@ -21,19 +21,23 @@
     return self;
 }
 
-- (void)processBuffer:(float *)buffer count:(int)count {
+- (void)processBuffer:(const float *)buffer count:(int)count {
     processor->process(buffer, count);
 }
 
-- (simd_float4)getMagnitudes {
-    // This creates a vector directly in memory/registers. Zero heap allocation.
-    return simd_make_float4(processor->magnitudes[0],
-                            processor->magnitudes[1],
-                            processor->magnitudes[2],
-                            processor->magnitudes[3]);
+- (simd_float4)getSmoothedMagnitudes {
+    // Calls getBand() which does memory_order_relaxed atomic loads —
+    // no heap allocation, safe to call from the render thread
+    return simd_make_float4(
+        processor->getBand(0),
+        processor->getBand(1),
+        processor->getBand(2),
+        processor->getBand(3)
+    );
 }
 
 - (void)dealloc {
     delete processor;
 }
+
 @end
