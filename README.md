@@ -90,9 +90,9 @@ Contributions are welcome! Since this project aims for hyper-efficiency:
 This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
 
 **What this means:**
-* ✅ **You can** use this library to build open source tools.
-* ✅ **You can** modify the library to suit your needs.
-* 🛑 **If you use this library** in a networked service (e.g., a backend server interacting with clients), you **must** make the source code of that service available to users.
-* 🛑 **If you distribute** a binary that links to this library, you **must** provide the source code for your application.
+* ✅ **You can** use this project's code (such as the DSP module) to build open source tools.
+* ✅ **You can** modify the project to suit your needs.
+* 🛑 **If you use this code** in a networked service (e.g., a backend server interacting with clients), you **must** make the source code of that service available to users.
+* 🛑 **If you distribute** a binary that uses this project's code, you **must** provide the source code for your application.
 
 See [LICENSE](LICENSE) for more details.
