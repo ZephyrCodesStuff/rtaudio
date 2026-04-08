@@ -20,6 +20,10 @@
 
 - [@zeph](https://github.com/ZephyrCodesStuff) (that's me!)
 
+## 💙 Projects using `rtaudio`
+
+- [Atoll](https://github.com/Ebullioscopic/Atoll) (over 1.7k stars on GitHub!)
+
 ## 📖 Overview
 
 **rtaudio** is a computationally invisible, real-time macOS system audio visualizer. It drops deep into the macOS hardware stack to capture targeted application audio via kernel-level CoreAudio taps, performs a hardware-accelerated Fast Fourier Transform (FFT) in C++, and renders a buttery-smooth waveform entirely on the GPU using custom Metal fragment shaders.
