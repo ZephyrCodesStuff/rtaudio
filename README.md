@@ -87,12 +87,12 @@ Contributions are welcome! Since this project aims for hyper-efficiency:
 
 ## 📄 License
 
-This project is licensed under the **MIT License**.
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
 
 **What this means:**
-
-- ✅ **You can** use this code in your own projects.
-- ✅ **You can** modify the tool to suit your needs.
-- ✅ **You can** distribute closed-source versions.
+* ✅ **You can** use this library to build open source tools.
+* ✅ **You can** modify the library to suit your needs.
+* 🛑 **If you use this library** in a networked service (e.g., a backend server interacting with clients), you **must** make the source code of that service available to users.
+* 🛑 **If you distribute** a binary that links to this library, you **must** provide the source code for your application.
 
 See [LICENSE](LICENSE) for more details.
