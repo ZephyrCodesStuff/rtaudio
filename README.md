@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="rtaudio/Assets.xcassets/AppIcon.appiconset/Icon-iOS-Default-128x128@1x.png" alt="License">
+  <img src="rtaudio/Assets.xcassets/AppIcon.appiconset/Icon-macOS-Default-128x128@1x.png" alt="License">
 
   <h1><code>rtaudio</code></h1>
 
