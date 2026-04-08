@@ -20,6 +20,10 @@
 
 - [@zeph](https://github.com/ZephyrCodesStuff) (that's me!)
 
+## 💙 Projects using `rtaudio`
+
+- [Atoll](https://github.com/Ebullioscopic/Atoll) (over 1.7k stars on GitHub!)
+
 ## 📖 Overview
 
 **rtaudio** is a computationally invisible, real-time macOS system audio visualizer. It drops deep into the macOS hardware stack to capture targeted application audio via kernel-level CoreAudio taps, performs a hardware-accelerated Fast Fourier Transform (FFT) in C++, and renders a buttery-smooth waveform entirely on the GPU using custom Metal fragment shaders.
@@ -87,12 +91,12 @@ Contributions are welcome! Since this project aims for hyper-efficiency:
 
 ## 📄 License
 
-This project is licensed under the **MIT License**.
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
 
 **What this means:**
-
-- ✅ **You can** use this code in your own projects.
-- ✅ **You can** modify the tool to suit your needs.
-- ✅ **You can** distribute closed-source versions.
+* ✅ **You can** use this project's code (such as the DSP module) to build open source tools.
+* ✅ **You can** modify the project to suit your needs.
+* 🛑 **If you use this code** in a networked service (e.g., a backend server interacting with clients), you **must** make the source code of that service available to users.
+* 🛑 **If you distribute** a binary that uses this project's code, you **must** provide the source code for your application.
 
 See [LICENSE](LICENSE) for more details.
