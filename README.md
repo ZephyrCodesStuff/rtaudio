@@ -16,6 +16,11 @@
 
 ---
 
+> [!WARNING]
+> `rtaudio` is mostly a PoC and, as such, not under active development. The algorithm is finalized and the app won't receive more features. `rtaudio` is not really meant to be used as a daily app (although nobody stops you!)
+>
+> If you'd like a production-ready, polished app you can use right away, consider checking out [Halo](https://halowave.app). It uses `rtaudio`'s DSP engine under the hood, plus a handful of added optimizations.
+
 ## 🌟 Authors
 
 - [@zeph](https://github.com/ZephyrCodesStuff) (that's me!)
